@@ -1,0 +1,45 @@
+{
+  "name": "aawqdata",
+  "private": true,
+  "sideEffects": false,
+  "type": "module",
+  "description": "AAwQData: pengecekan kualitas nomor target sebelum dikirim lewat WSPro",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "start": "node .output/server/index.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "overrides": {
+    "rolldown": "1.2.1"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
+    "@tailwindcss/vite": "^4.2.1",
+    "@tanstack/react-router": "1.170.41",
+    "@tanstack/react-start": "1.168.60",
+    "@tanstack/router-plugin": "1.168.42",
+    "clsx": "^2.1.1",
+    "libphonenumber-js": "^1.13.13",
+    "lucide-react": "^0.575.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.2.1",
+    "vite-tsconfig-paths": "^6.0.2",
+    "xlsx-js-style": "^1.2.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.5",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "nitro": "3.0.260603-beta",
+    "typescript": "^5.8.3",
+    "vite": "8.1.5",
+    "vitest": "^5.0.3"
+  }
+}
