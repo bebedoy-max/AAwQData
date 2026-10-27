@@ -6,7 +6,7 @@ interface Tiket {
   daftarId: string;
   nama: string;
   kategori: "siap" | "ragu" | "buang" | "semua";
-  format: "lengkap" | "nomor";
+  format: "lengkap" | "nomor" | "laporan";
   userId: string;
   habis: number;
 }
@@ -75,6 +75,62 @@ export function aliranCsv(t: Tiket): ReadableStream<Uint8Array> {
         )
         .join("\n");
       ctrl.enqueue(enc.encode(teks + "\n"));
+    },
+  });
+}
+
+/**
+ * Laporan Bio dalam bentuk teks: statistik, lalu semua nomor bisnis per level (dialirkan per 5.000).
+ * Setiap pull wajib mengirim sesuatu atau menutup aliran: pull yang selesai tanpa enqueue tidak dipanggil lagi.
+ */
+export function aliranLaporan(t: Tiket): ReadableStream<Uint8Array> {
+  const enc = new TextEncoder();
+  let antrean: Array<[string, number]> | null = null;
+  let level: string | null = null;
+  let terakhir = 0;
+  return new ReadableStream({
+    async pull(ctrl) {
+      const { kepalaLaporan, kepalaKelompok, barisBisnis, urutLevel } = await import("./laporan");
+      const db = supabaseAdmin();
+      if (antrean === null) {
+        const { data, error } = await db.rpc("aawq_laporan_bio", { p_daftar: t.daftarId });
+        if (error) {
+          ctrl.enqueue(enc.encode(`LAPORAN GAGAL: ${error.message}\n`));
+          ctrl.close();
+          return;
+        }
+        const stat = data as import("./laporan").StatLaporan;
+        antrean = urutLevel(Object.keys(stat.level)).map((l) => [l, stat.level[l] ?? 0]);
+        ctrl.enqueue(enc.encode(`\uFEFF${kepalaLaporan(t.nama, stat, new Date())}`));
+        return;
+      }
+      for (;;) {
+        if (level === null) {
+          const berikut = antrean.shift();
+          if (!berikut) {
+            ctrl.close();
+            return;
+          }
+          [level] = berikut;
+          terakhir = 0;
+          ctrl.enqueue(enc.encode(`\n${kepalaKelompok(level, berikut[1])}`));
+          return;
+        }
+        const { data, error } = await db.rpc("aawq_laporan_bisnis", { p_daftar: t.daftarId, p_level: level, p_setelah: terakhir, p_n: 5000 });
+        if (error) {
+          ctrl.enqueue(enc.encode(`\n# UNDUHAN GAGAL: ${error.message}\n`));
+          ctrl.close();
+          return;
+        }
+        const baris = (data ?? []) as import("./laporan").BarisBisnis[];
+        if (!baris.length) {
+          level = null;
+          continue;
+        }
+        terakhir = baris[baris.length - 1]!.id;
+        ctrl.enqueue(enc.encode(baris.map(barisBisnis).join("\n") + "\n"));
+        return;
+      }
     },
   });
 }

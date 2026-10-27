@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LaporanRouteImport } from './routes/laporan'
 import { Route as MasukRouteImport } from './routes/masuk'
 import { Route as PengecekRouteImport } from './routes/pengecek'
 import { Route as DaftarIndexRouteImport } from './routes/daftar.index'
@@ -20,6 +21,11 @@ import { Route as ApiEksporTiketRouteImport } from './routes/api/ekspor.$tiket'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LaporanRoute = LaporanRouteImport.update({
+  id: '/laporan',
+  path: '/laporan',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MasukRoute = MasukRouteImport.update({
@@ -55,6 +61,7 @@ const ApiEksporTiketRoute = ApiEksporTiketRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/laporan': typeof LaporanRoute
   '/masuk': typeof MasukRoute
   '/pengecek': typeof PengecekRoute
   '/daftar/$id': typeof DaftarIdRoute
@@ -64,6 +71,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/laporan': typeof LaporanRoute
   '/masuk': typeof MasukRoute
   '/pengecek': typeof PengecekRoute
   '/daftar/$id': typeof DaftarIdRoute
@@ -74,6 +82,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/laporan': typeof LaporanRoute
   '/masuk': typeof MasukRoute
   '/pengecek': typeof PengecekRoute
   '/daftar/$id': typeof DaftarIdRoute
@@ -85,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/laporan'
     | '/masuk'
     | '/pengecek'
     | '/daftar/$id'
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/laporan'
     | '/masuk'
     | '/pengecek'
     | '/daftar/$id'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/laporan'
     | '/masuk'
     | '/pengecek'
     | '/daftar/$id'
@@ -113,6 +125,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LaporanRoute: typeof LaporanRoute
   MasukRoute: typeof MasukRoute
   PengecekRoute: typeof PengecekRoute
   DaftarIdRoute: typeof DaftarIdRoute
@@ -128,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/laporan': {
+      id: '/laporan'
+      path: '/laporan'
+      fullPath: '/laporan'
+      preLoaderRoute: typeof LaporanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/masuk': {
@@ -177,6 +197,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LaporanRoute: LaporanRoute,
   MasukRoute: MasukRoute,
   PengecekRoute: PengecekRoute,
   DaftarIdRoute: DaftarIdRoute,

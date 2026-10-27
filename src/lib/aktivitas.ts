@@ -18,6 +18,8 @@ export interface SinyalWa {
   hilangTs: string | null;
   business: boolean | null;
   picture: "ada" | "tidak_ada" | "tersembunyi" | null;
+  /** Hanya untuk laporan (tidak memengaruhi skor); tidak ada pada sinyal dari gateway versi lama. */
+  bisnisVn?: { level: string | null; nama: string | null; sejak: string | null } | false | null;
 }
 
 export interface AturanAktif {
@@ -44,7 +46,7 @@ export interface HasilAktivitas {
 }
 
 /** Teks About bawaan/pilihan cepat WhatsApp (berbagai bahasa): bukan tulisan sendiri pemiliknya. */
-const ABOUT_BAWAAN =
+export const ABOUT_BAWAAN =
   /^(hey there! i am using whatsapp\.?|available|disponível|disponivel|disponible|ada|tersedia|halo! saya menggunakan whatsapp\.?|olá! eu estou usando o whatsapp\.?|ola! eu estou usando o whatsapp\.?|hola, estoy usando whatsapp\.?|busy|sibuk|ocupado|at work|di kantor|no trabalho|en el trabajo|urgent calls only|hanya panggilan darurat|somente ligações urgentes|battery about to die|can'?t talk,? whatsapp only|in a meeting|sleeping|at school|at the gym|at the movies)$/i;
 
 const hari = (iso: string | null, sekarang: Date) => (iso ? (sekarang.getTime() - Date.parse(iso)) / 86_400_000 : null);

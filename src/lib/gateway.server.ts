@@ -36,7 +36,15 @@ export interface HasilProfilGateway {
   about?: { status: "ada" | "kosong" | "tersembunyi"; teks: string | null; ts: string | null } | null;
   hilangTs?: string | null;
   business?: boolean | null;
+  /** Sertifikat nama bisnis: level dari WhatsApp + waktu terbit; false = akun pribadi; null = tidak terbaca. */
+  bisnisVn?: SertifikatBisnis | false | null;
   picture?: "ada" | "tidak_ada" | "tersembunyi" | null;
+}
+
+export interface SertifikatBisnis {
+  level: string | null;
+  nama: string | null;
+  sejak: string | null;
 }
 
 export const gatewayTerkonfigurasi = () => !!(process.env["WA_GATEWAY_URL"] && process.env["WA_GATEWAY_API_KEY"]);

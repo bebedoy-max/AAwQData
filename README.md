@@ -61,6 +61,17 @@ yang dibaca gateway lewat Baileys (`POST /api/contacts/profile-batch`). Sinyal y
   (`whatsapp`, `skor_aktif`).
 - Bobot dan ambang adalah titik awal: perlu dikalibrasi dengan hasil kirim nyata dari WSPRO.
 
+## Laporan Bio
+
+Menu **Laporan Bio** merangkum satu daftar dari hasil cek WhatsApp yang sudah tersimpan (tanpa kueri tambahan):
+terdaftar / tidak terdaftar, bio (ditulis sendiri, teks bawaan, kosong, disembunyikan), akun pribadi vs **Business Meta per
+level**, dan **tahun sertifikat bisnis diterbitkan**, lengkap dengan daftar nomor bisnis per level. Unduhan **.txt** berisi
+seluruh nomor bisnis tanpa batas.
+
+- Level = `verified_level` sertifikat nama bisnis dari WhatsApp (mis. `low`, `high`); tahun = waktu terbit sertifikat itu
+  (perkiraan umur akun bisnis, bukan umur nomor). Butuh gateway AABaileys versi yang mengirim `bisnisVn`.
+- Bio dan bisnis terbaca pada fase **skor aktif**: nyalakan *Nilai aktivitas akun* di Pengecek WA.
+
 ## Rencana berikutnya
 
 - **Tahap 3: kirim ke WSPRO**: tombol buat kampanye (draft) berisi nomor Siap kirim lewat endpoint ber-kunci API di WSPRO;
@@ -78,7 +89,7 @@ TanStack Start + React + Tailwind (sama dengan WSPRO, tanpa Lovable), Supabase s
 ## Pemasangan
 
 1. **Supabase baru** (self-hosted, terpisah dari WSPRO). Jalankan `db/migrations/001_awal.sql` lalu
-   `002_cek_whatsapp.sql`, `003_skor_aktif.sql`, `004_batas_waktu.sql` di SQL editor.
+   `002_cek_whatsapp.sql`, `003_skor_aktif.sql`, `004_batas_waktu.sql`, `005_laporan_bio.sql` di SQL editor.
    Migrasi bersifat aditif dan aman dijalankan ulang; migrasi berikutnya selalu berkas baru.
 2. **Pengguna**: buat akun di Supabase > Authentication > Users (email + sandi). Matikan pendaftaran publik
    (Authentication > Providers > Email > *Allow new users to sign up*), karena aplikasi ini hanya untuk pemilik.

@@ -119,6 +119,7 @@ function keSinyal(x: HasilProfilGateway): SinyalWa {
     hilangTs: x.hilangTs ?? null,
     business: x.business ?? null,
     picture: x.picture ?? null,
+    bisnisVn: x.bisnisVn ?? null,
   };
 }
 

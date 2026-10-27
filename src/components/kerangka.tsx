@@ -30,11 +30,14 @@ export function Kerangka({ judul, aksi, children }: { judul?: ReactNode; aksi?: 
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
           <Link to="/daftar" className="flex items-center gap-2 font-bold tracking-wide">
             <ShieldCheck className="size-5 text-aksen" aria-hidden />
-            AAwQData
+            <span className="hidden sm:inline">AAwQData</span>
           </Link>
-          <nav className="ml-2 flex gap-1 text-sm">
+          <nav className="ml-1 flex gap-1 whitespace-nowrap text-sm sm:ml-2">
             <Link to="/daftar" className="rounded-md px-2 py-1 text-redup hover:text-teks" activeProps={{ className: "text-teks" }}>
               Daftar
+            </Link>
+            <Link to="/laporan" className="rounded-md px-2 py-1 text-redup hover:text-teks" activeProps={{ className: "text-teks" }}>
+              Laporan Bio
             </Link>
             <Link to="/pengecek" className="rounded-md px-2 py-1 text-redup hover:text-teks" activeProps={{ className: "text-teks" }}>
               Pengecek WA

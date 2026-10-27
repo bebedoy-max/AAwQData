@@ -24,3 +24,11 @@ describe("bobot SQL selaras dengan ALASAN", () => {
     expect([...buangSql].sort()).toEqual(buangTs.sort());
   });
 });
+
+describe("teks About bawaan SQL selaras dengan aktivitas.ts", () => {
+  it("pola aawq_about_bawaan sama dengan ABOUT_BAWAAN", async () => {
+    const { ABOUT_BAWAAN } = await import("./aktivitas");
+    const m = semua.match(/aawq_about_bawaan\(p_teks text\)[\s\S]*?~\* '([^]*?)', false\)/);
+    expect(m?.[1]?.replace(/''/g, "'") ?? "").toBe(`^${ABOUT_BAWAAN.source.replace(/^\^/, "").replace(/\$$/, "")}$`);
+  });
+});
