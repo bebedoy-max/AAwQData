@@ -78,7 +78,7 @@ TanStack Start + React + Tailwind (sama dengan WSPRO, tanpa Lovable), Supabase s
 ## Pemasangan
 
 1. **Supabase baru** (self-hosted, terpisah dari WSPRO). Jalankan `db/migrations/001_awal.sql` lalu
-   `002_cek_whatsapp.sql`, `003_skor_aktif.sql` di SQL editor.
+   `002_cek_whatsapp.sql`, `003_skor_aktif.sql`, `004_batas_waktu.sql` di SQL editor.
    Migrasi bersifat aditif dan aman dijalankan ulang; migrasi berikutnya selalu berkas baru.
 2. **Pengguna**: buat akun di Supabase > Authentication > Users (email + sandi). Matikan pendaftaran publik
    (Authentication > Providers > Email > *Allow new users to sign up*), karena aplikasi ini hanya untuk pemilik.
