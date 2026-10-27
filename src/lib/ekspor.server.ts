@@ -44,12 +44,12 @@ export function aliranCsv(t: Tiket): ReadableStream<Uint8Array> {
       if (mulai) {
         mulai = false;
         // BOM agar Excel membaca UTF-8 dengan benar.
-        ctrl.enqueue(enc.encode(t.format === "nomor" ? "﻿nomor\n" : "﻿baris,mentah,nomor,negara,tipe,kategori,skor,alasan,koreksi_dari\n"));
+        ctrl.enqueue(enc.encode(t.format === "nomor" ? "﻿nomor\n" : "﻿baris,mentah,nomor,negara,tipe,kategori,skor,alasan,koreksi_dari,whatsapp,skor_aktif\n"));
         return;
       }
       let q = supabaseAdmin()
         .from("aawq_nomor")
-        .select("id, baris, mentah, e164, negara, tipe, kategori, skor, alasan, koreksi_dari")
+        .select("id, baris, mentah, e164, negara, tipe, kategori, skor, alasan, koreksi_dari, wa, aktif_skor")
         .eq("daftar_id", t.daftarId)
         .gt("id", terakhir)
         .order("id")
@@ -71,7 +71,7 @@ export function aliranCsv(t: Tiket): ReadableStream<Uint8Array> {
         .map((r) =>
           t.format === "nomor"
             ? selCsv(r.e164)
-            : [r.baris, r.mentah, r.e164, r.negara, r.tipe, r.kategori, r.skor, labelAlasan(r.alasan ?? []), r.koreksi_dari].map(selCsv).join(","),
+            : [r.baris, r.mentah, r.e164, r.negara, r.tipe, r.kategori, r.skor, labelAlasan(r.alasan ?? []), r.koreksi_dari, r.wa === true ? "terdaftar" : r.wa === false ? "tidak terdaftar" : "", r.aktif_skor].map(selCsv).join(","),
         )
         .join("\n");
       ctrl.enqueue(enc.encode(teks + "\n"));

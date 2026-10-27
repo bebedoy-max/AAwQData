@@ -9,9 +9,31 @@ export interface AturanCek {
   jeda_maks_detik: number;
   batas_harian: number;
   umur_cache_hari: number;
+  /** Fase kedua: sinyal aktivitas untuk nomor yang terdaftar (lihat aktivitas.ts). */
+  cek_aktivitas: boolean;
+  cek_foto: boolean;
+  cek_bisnis: boolean;
+  ambang_ragu: number;
+  ambang_buang: number;
+  bisnis: "ragu" | "biarkan";
 }
 
-export const ATURAN_BAWAAN: AturanCek = { ukuran_kelompok: 20, jeda_min_detik: 8, jeda_maks_detik: 15, batas_harian: 15000, umur_cache_hari: 30 };
+export const ATURAN_BAWAAN: AturanCek = {
+  ukuran_kelompok: 20,
+  jeda_min_detik: 8,
+  jeda_maks_detik: 15,
+  batas_harian: 15000,
+  umur_cache_hari: 30,
+  cek_aktivitas: true,
+  cek_foto: true,
+  cek_bisnis: true,
+  ambang_ragu: 50,
+  ambang_buang: 25,
+  bisnis: "ragu",
+};
+
+/** Ukuran kelompok fase aktivitas: gateway menerima maks 20 nomor bila foto ikut dicek (foto diambil per nomor). */
+export const ukuranKelompokAktif = (a: AturanCek) => Math.min(a.ukuran_kelompok, a.cek_foto ? 20 : 50);
 
 export interface KeadaanPengecek {
   aktif: boolean;

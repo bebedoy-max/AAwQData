@@ -121,13 +121,24 @@ export const simpanAturan = createServerFn({ method: "POST" })
       jeda_maks_detik: z.number().int().min(3).max(3600),
       batas_harian: z.number().int().min(0).max(1_000_000),
       umur_cache_hari: z.number().int().min(0).max(365),
+      cek_aktivitas: z.boolean(),
+      cek_foto: z.boolean(),
+      cek_bisnis: z.boolean(),
+      ambang_ragu: z.number().int().min(0).max(100),
+      ambang_buang: z.number().int().min(0).max(100),
+      bisnis: z.enum(["ragu", "biarkan"]),
     }),
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("./supabase.server");
     const { error } = await supabaseAdmin()
       .from("aawq_pengaturan")
-      .upsert({ user_id: context.userId, ...data, jeda_maks_detik: Math.max(data.jeda_min_detik, data.jeda_maks_detik) });
+      .upsert({
+        user_id: context.userId,
+        ...data,
+        jeda_maks_detik: Math.max(data.jeda_min_detik, data.jeda_maks_detik),
+        ambang_buang: Math.min(data.ambang_buang, data.ambang_ragu),
+      });
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -138,7 +149,7 @@ export const mulaiCekWa = createServerFn({ method: "POST" })
   .inputValidator(z.object({ daftarId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin, pastikanPemilik } = await import("./supabase.server");
-    const { aturanPengguna, pastikanPekerjaCekWa, selesaikanBilaHabis } = await import("./cek-wa.server");
+    const { aturanPengguna, nilaiDariCache, pastikanPekerjaCekWa, selesaikanBilaHabis } = await import("./cek-wa.server");
     const { gatewayTerkonfigurasi } = await import("./gateway.server");
     if (!gatewayTerkonfigurasi()) throw new Error("Gateway belum diatur di server (WA_GATEWAY_URL, WA_GATEWAY_API_KEY).");
     const daftar = await pastikanPemilik(data.daftarId, context.userId);
@@ -148,9 +159,10 @@ export const mulaiCekWa = createServerFn({ method: "POST" })
     const { data: dariCache, error } = await db.rpc("aawq_terapkan_cache_wa", { p_daftar: daftar.id, p_umur_hari: aturan.umur_cache_hari });
     if (error) throw new Error(error.message);
     await db.from("aawq_daftar").update({ cek_wa_status: "berjalan", cek_wa_mulai: new Date().toISOString(), cek_wa_selesai_pada: null }).eq("id", daftar.id);
-    const selesai = await selesaikanBilaHabis(daftar.id);
+    const aktifDariCache = aturan.cek_aktivitas ? await nilaiDariCache(daftar.id, aturan) : 0;
+    const selesai = await selesaikanBilaHabis(daftar.id, aturan);
     pastikanPekerjaCekWa();
-    return { dariCache: Number(dariCache) || 0, selesai };
+    return { dariCache: (Number(dariCache) || 0) + aktifDariCache, selesai };
   });
 
 export const jedaCekWa = createServerFn({ method: "POST" })
@@ -169,7 +181,7 @@ export const progresCekWa = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin, pastikanPemilik } = await import("./supabase.server");
     const { aturanPengguna, pastikanPekerjaCekWa } = await import("./cek-wa.server");
-    const { kesiapan, perkiraanDetik } = await import("./jadwal-cek");
+    const { kesiapan, perkiraanDetik, ukuranKelompokAktif } = await import("./jadwal-cek");
     const daftar = await pastikanPemilik(data.daftarId, context.userId);
     const db = supabaseAdmin();
     const { data: progres, error } = await db.rpc("aawq_progres_wa", { p_daftar: daftar.id });
@@ -178,14 +190,29 @@ export const progresCekWa = createServerFn({ method: "GET" })
     const aturan = await aturanPengguna(context.userId);
     const sekarang = new Date();
     const siap = (perangkat ?? []).filter((p) => kesiapan(p as never, aturan, sekarang).siap).length;
-    const p = progres as { sisa: number; terdaftar: number; tidak_terdaftar: number; tidak_pasti: number };
+    const p = progres as {
+      sisa: number;
+      terdaftar: number;
+      tidak_terdaftar: number;
+      tidak_pasti: number;
+      aktif_sisa: number;
+      aktif_dinilai: number;
+      aktif_baik: number;
+      aktif_rendah: number;
+      tidak_aktif: number;
+      bisnis: number;
+      skor_rata: number | null;
+    };
+    // Perkiraan: nomor fase 1 + (bila aktif) perkiraan fase 2 untuk nomor yang belum dicek, disetarakan ke ukuran kelompok fase 1.
+    const fase2 = aturan.cek_aktivitas ? ((p.aktif_sisa + p.sisa) * aturan.ukuran_kelompok) / ukuranKelompokAktif(aturan) : 0;
     if ((daftar as { cek_wa_status?: string }).cek_wa_status === "berjalan") pastikanPekerjaCekWa();
     return {
       status: (daftar as { cek_wa_status?: string }).cek_wa_status ?? "belum",
       ...p,
       perangkatSiap: siap,
       perangkatTotal: perangkat?.length ?? 0,
-      perkiraanDetik: perkiraanDetik(p.sisa, siap, aturan),
+      perkiraanDetik: perkiraanDetik(Math.ceil(p.sisa + fase2), siap, aturan),
+      cekAktivitas: aturan.cek_aktivitas,
       daftar: { jumlah_siap: daftar.jumlah_siap, jumlah_ragu: daftar.jumlah_ragu, jumlah_buang: daftar.jumlah_buang, jumlah_total: daftar.jumlah_total },
     };
   });

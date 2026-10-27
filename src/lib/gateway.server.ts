@@ -26,6 +26,19 @@ export interface HasilCekGateway {
   status: "terdaftar" | "tidak_terdaftar" | "tidak_pasti";
 }
 
+export interface HasilProfilGateway {
+  phone: string;
+  status: "ok" | "tidak_pasti";
+  perangkat?: number | null;
+  tertaut?: number | null;
+  hosted?: boolean | null;
+  kunciTs?: string | null;
+  about?: { status: "ada" | "kosong" | "tersembunyi"; teks: string | null; ts: string | null } | null;
+  hilangTs?: string | null;
+  business?: boolean | null;
+  picture?: "ada" | "tidak_ada" | "tersembunyi" | null;
+}
+
 export const gatewayTerkonfigurasi = () => !!(process.env["WA_GATEWAY_URL"] && process.env["WA_GATEWAY_API_KEY"]);
 
 async function minta<T>(jalur: string, init: RequestInit = {}, waktuMs = 60_000): Promise<T> {
@@ -63,6 +76,12 @@ export const gateway = {
   qr: (nama: string) => minta<{ value: string }>(`/api/${enc(nama)}/auth/qr?format=raw`),
   kodePairing: (nama: string, nomor: string) => minta<{ code: string }>(`/api/${enc(nama)}/auth/request-code`, { method: "POST", body: JSON.stringify({ phoneNumber: nomor }) }),
   lepasBatasCek: (nama: string) => minta<SesiGateway>(`/api/sessions/${enc(nama)}/clear-check-limit`, { method: "POST" }),
+  profil: (nama: string, nomor: string[], opsi: { foto: boolean; bisnis: boolean }) =>
+    minta<{ results: HasilProfilGateway[] }>(
+      "/api/contacts/profile-batch",
+      { method: "POST", body: JSON.stringify({ session: nama, phones: nomor, picture: opsi.foto, business: opsi.bisnis }) },
+      90_000,
+    ),
   cek: (nama: string, nomor: string[]) =>
     minta<{ results: HasilCekGateway[] }>("/api/contacts/check-exists-batch", { method: "POST", body: JSON.stringify({ session: nama, phones: nomor }) }, 90_000),
 };

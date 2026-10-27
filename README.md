@@ -35,8 +35,31 @@ yang dipasangkan di menu **Pengecek WA**. Pengecekan berjalan di latar belakang 
 - Laju bisa diatur (bawaan hati-hati: 20 nomor per 8-15 detik, 15.000/hari per perangkat). Lebih banyak perangkat =
   lebih cepat; perkiraan waktu tampil di kartu cek.
 - Hasil disimpan (cache) dan dipakai ulang untuk daftar lain selama 30 hari (bisa diatur): nomor yang sama tidak dicek dua kali.
-- Butuh gateway **AABaileys** dengan endpoint `POST /api/contacts/check-exists-batch` (cabang `claude/inspiring-pascal-u9tnq7`
+- Butuh gateway **AABaileys** dengan endpoint `POST /api/contacts/check-exists-batch` dan `profile-batch` (cabang `claude/inspiring-pascal-u9tnq7`
   di repo AABaileys). Pakai **instance gateway terpisah** dari WSPRO.
+
+## Skor aktif (Tahap 2b)
+
+Setelah cek terdaftar selesai, nomor yang **terdaftar** diberi **skor aktif 0-100**: rata-rata berbobot dari sinyal profil
+yang dibaca gateway lewat Baileys (`POST /api/contacts/profile-batch`). Sinyal yang tidak terbaca (disembunyikan privasi)
+**tidak dihitung**, jadi tidak menurunkan skor; rata-rata hanya dari sinyal yang ada.
+
+| Sinyal | Bobot | Poin |
+| --- | --- | --- |
+| Perangkat terakhir berubah (kunci perangkat) | 3 | ≤30 hari 100, ≤90 90, ≤180 80, ≤1 th 65, ≤2 th 50, ≤3 th 40, lebih lama 30 |
+| About (umur tulisan) | 2 | ≤90 hari 100, ≤1 th 80, ≤3 th 60, lebih lama 40; teks bawaan WhatsApp -30; disembunyikan = tidak dihitung |
+| Foto profil | 2 | ada 85, tidak ada 30, disembunyikan = tidak dihitung |
+| Perangkat tertaut (WA Web/desktop) | 1 | ada 100, tidak ada = tidak dihitung |
+| Pesan sementara diatur | 1 | ≤1 th 100, lebih lama 75 |
+
+- Skor di bawah **ambang Ragu** (bawaan 50) → Ragu (*Aktivitas rendah*); di bawah **ambang Buang** (bawaan 25) → Buang
+  (*Kemungkinan tidak aktif*).
+- **Akun bisnis** (WhatsApp Business / API) → Ragu (*Akun bisnis*) atau dibiarkan, sesuai pengaturan.
+- Semua bisa diatur di **Pengecek WA > Aturan**: aktif/nonaktif, cek foto (lebih lambat: maks 20 nomor per kueri),
+  cek bisnis, kedua ambang. Hasil juga disimpan (cache) untuk daftar lain.
+- Skor dan sinyal tampil di kolom **Aktif** tabel nomor (arahkan kursor untuk rinciannya) dan di unduhan CSV lengkap
+  (`whatsapp`, `skor_aktif`).
+- Bobot dan ambang adalah titik awal: perlu dikalibrasi dengan hasil kirim nyata dari WSPRO.
 
 ## Rencana berikutnya
 
@@ -55,7 +78,7 @@ TanStack Start + React + Tailwind (sama dengan WSPRO, tanpa Lovable), Supabase s
 ## Pemasangan
 
 1. **Supabase baru** (self-hosted, terpisah dari WSPRO). Jalankan `db/migrations/001_awal.sql` lalu
-   `002_cek_whatsapp.sql` di SQL editor.
+   `002_cek_whatsapp.sql`, `003_skor_aktif.sql` di SQL editor.
    Migrasi bersifat aditif dan aman dijalankan ulang; migrasi berikutnya selalu berkas baru.
 2. **Pengguna**: buat akun di Supabase > Authentication > Users (email + sandi). Matikan pendaftaran publik
    (Authentication > Providers > Email > *Allow new users to sign up*), karena aplikasi ini hanya untuk pemilik.

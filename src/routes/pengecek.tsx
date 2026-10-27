@@ -182,25 +182,49 @@ function Pemasangan({ id, tutup }: { id: string; tutup: () => void }) {
 function FormAturan({ aturan, onSimpan }: { aturan: Data["aturan"]; onSimpan: () => void }) {
   const fnSimpan = useServerFn(simpanAturan);
   const [f, setF] = useState(aturan);
-  const kolom: Array<[keyof typeof f, string, string]> = [
-    ["ukuran_kelompok", "Nomor per kueri", "1-50"],
-    ["jeda_min_detik", "Jeda minimum (detik)", "per perangkat"],
-    ["jeda_maks_detik", "Jeda maksimum (detik)", "acak di antara min-maks"],
-    ["batas_harian", "Batas harian per perangkat", "0 = tanpa batas"],
-    ["umur_cache_hari", "Pakai hasil cek lama (hari)", "nomor tidak dicek ulang"],
-  ];
+  type KunciAngka = "ukuran_kelompok" | "jeda_min_detik" | "jeda_maks_detik" | "batas_harian" | "umur_cache_hari" | "ambang_ragu" | "ambang_buang";
+  const angkaKolom = (k: KunciAngka, label: string, bantu: string) => (
+    <label key={k} className="block text-sm text-redup">
+      {label} <span className="text-xs">({bantu})</span>
+      <input type="number" value={f[k]} onChange={(e) => setF({ ...f, [k]: Number(e.target.value) })} className="mt-1 w-full rounded-md border border-garis bg-panel-2 px-3 py-1.5 text-teks" />
+    </label>
+  );
+  const centang = (k: "cek_aktivitas" | "cek_foto" | "cek_bisnis", label: string) => (
+    <label key={k} className="flex items-center gap-2 text-sm">
+      <input type="checkbox" checked={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.checked })} /> {label}
+    </label>
+  );
   return (
     <Kartu>
       <h2 className="mb-2 font-semibold">Laju pengecekan</h2>
       <div className="space-y-2">
-        {kolom.map(([k, label, bantu]) => (
-          <label key={k} className="block text-sm text-redup">
-            {label} <span className="text-xs">({bantu})</span>
-            <input type="number" value={f[k]} onChange={(e) => setF({ ...f, [k]: Number(e.target.value) })} className="mt-1 w-full rounded-md border border-garis bg-panel-2 px-3 py-1.5 text-teks" />
-          </label>
-        ))}
+        {angkaKolom("ukuran_kelompok", "Nomor per kueri", "1-50")}
+        {angkaKolom("jeda_min_detik", "Jeda minimum (detik)", "per perangkat")}
+        {angkaKolom("jeda_maks_detik", "Jeda maksimum (detik)", "acak di antara min-maks")}
+        {angkaKolom("batas_harian", "Batas harian per perangkat", "0 = tanpa batas")}
+        {angkaKolom("umur_cache_hari", "Pakai hasil cek lama (hari)", "nomor tidak dicek ulang")}
       </div>
       <p className="mt-2 text-xs text-redup">Bawaan hati-hati: 20 nomor per 8-15 detik (~6.000/jam) dan 15.000/hari per perangkat.</p>
+
+      <h2 className="mt-5 mb-2 font-semibold">Skor aktif</h2>
+      <div className="space-y-2">
+        {centang("cek_aktivitas", "Nilai aktivitas akun yang terdaftar")}
+        {centang("cek_foto", "Ikut cek foto profil (per nomor, lebih lambat)")}
+        {centang("cek_bisnis", "Ikut cek akun bisnis")}
+        {angkaKolom("ambang_ragu", "Ambang Ragu", "skor di bawah ini = Aktivitas rendah")}
+        {angkaKolom("ambang_buang", "Ambang Buang", "skor di bawah ini = Kemungkinan tidak aktif; 0 = tidak pernah dibuang")}
+        <label className="block text-sm text-redup">
+          Akun bisnis
+          <select value={f.bisnis} onChange={(e) => setF({ ...f, bisnis: e.target.value as "ragu" | "biarkan" })} className="mt-1 w-full rounded-md border border-garis bg-panel-2 px-3 py-1.5 text-teks">
+            <option value="ragu">Tandai Ragu (bukan akun pribadi)</option>
+            <option value="biarkan">Biarkan</option>
+          </select>
+        </label>
+      </div>
+      <p className="mt-2 text-xs text-redup">
+        Skor = rata-rata berbobot sinyal yang terbaca: perangkat terakhir berubah (x3), About (x2), foto (x2), perangkat tertaut, pesan sementara. Sinyal yang disembunyikan pemilik
+        tidak dihitung.
+      </p>
       <Tombol className="mt-3 w-full" onClick={() => void fnSimpan({ data: f }).then(() => (toast.success("Tersimpan"), onSimpan()), (e: Error) => toast.error(e.message))}>
         Simpan
       </Tombol>

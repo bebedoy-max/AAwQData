@@ -6,8 +6,9 @@
  * tidak pernah dianggap "tidak terdaftar". Perangkat yang dibatasi WhatsApp ditahan sampai waktu dari gateway, nomor
  * yang sedang diklaim dikembalikan ke antrean, dan perangkat lain tetap bekerja.
  */
-import { ATURAN_BAWAAN, cekHariIni, hariWib, jedaBerikut, kesiapan, type AturanCek } from "./jadwal-cek";
-import { GalatGateway, gateway, gatewayTerkonfigurasi } from "./gateway.server";
+import { nilaiAktivitas, type SinyalWa } from "./aktivitas";
+import { ATURAN_BAWAAN, cekHariIni, hariWib, jedaBerikut, kesiapan, ukuranKelompokAktif, type AturanCek } from "./jadwal-cek";
+import { GalatGateway, gateway, gatewayTerkonfigurasi, type HasilProfilGateway } from "./gateway.server";
 import { supabaseAdmin } from "./supabase.server";
 
 interface BarisPengecek {
@@ -107,22 +108,81 @@ async function detak(): Promise<void> {
   }
 }
 
+/** Sinyal mentah dari gateway (tanpa field status/phone) untuk disimpan dan dinilai. */
+function keSinyal(x: HasilProfilGateway): SinyalWa {
+  return {
+    perangkat: x.perangkat ?? null,
+    tertaut: x.tertaut ?? null,
+    hosted: x.hosted ?? null,
+    kunciTs: x.kunciTs ?? null,
+    about: x.about ?? null,
+    hilangTs: x.hilangTs ?? null,
+    business: x.business ?? null,
+    picture: x.picture ?? null,
+  };
+}
+
+/** Nilai nomor terdaftar yang sinyalnya masih segar di cache (tanpa kueri ke WhatsApp). */
+export async function nilaiDariCache(daftarId: string, a: AturanCek): Promise<number> {
+  const db = supabaseAdmin();
+  let total = 0;
+  for (;;) {
+    const { data, error } = await db.rpc("aawq_aktif_dari_cache", { p_daftar: daftarId, p_umur_hari: a.umur_cache_hari, p_n: 1000 });
+    if (error) throw new Error(error.message);
+    const baris = (data ?? []) as Array<{ e164: string; sinyal: SinyalWa }>;
+    if (!baris.length) return total;
+    const hasil = baris.map((b) => {
+      const n = nilaiAktivitas(b.sinyal, a);
+      return { e164: b.e164, sinyal: b.sinyal, skor: n.skor, alasan: n.alasan, dari_cache: true };
+    });
+    const { error: e2 } = await db.rpc("aawq_simpan_aktif", { p_daftar: daftarId, p_hasil: hasil });
+    if (e2) throw new Error(e2.message);
+    total += baris.length;
+  }
+}
+
+/**
+ * Satu langkah satu perangkat: fase 1 cek terdaftar; setelah antrean fase 1 daftar itu habis, fase 2 sinyal
+ * aktivitas untuk nomor yang terdaftar (bila diaktifkan).
+ */
 async function kerjakan(p: BarisPengecek, daftarId: string, a: AturanCek, st: { berikut: number }): Promise<void> {
   const db = supabaseAdmin();
+  let fase: "terdaftar" | "aktif" = "terdaftar";
   const { data: klaim, error } = await db.rpc("aawq_klaim_wa", { p_daftar: daftarId, p_n: a.ukuran_kelompok });
   if (error) throw new Error(error.message);
-  const nomor = (klaim ?? []) as string[];
+  let nomor = (klaim ?? []) as string[];
+  if (!nomor.length && a.cek_aktivitas) {
+    await nilaiDariCache(daftarId, a);
+    fase = "aktif";
+    const { data: k2, error: e2 } = await db.rpc("aawq_klaim_aktif", { p_daftar: daftarId, p_n: ukuranKelompokAktif(a) });
+    if (e2) throw new Error(e2.message);
+    nomor = (k2 ?? []) as string[];
+  }
   if (!nomor.length) {
-    await selesaikanBilaHabis(daftarId);
+    await selesaikanBilaHabis(daftarId, a);
     st.berikut = Date.now() + 2000;
     return;
   }
   try {
-    const r = await gateway.cek(p.sesi, nomor);
-    const peta = new Map(r.results.map((x) => [x.phone, x.numberExists]));
-    const hasil = nomor.map((e164) => ({ e164, terdaftar: peta.get(e164) ?? null }));
-    const { error: e2 } = await db.rpc("aawq_simpan_cek_wa", { p_daftar: daftarId, p_hasil: hasil });
-    if (e2) throw new Error(e2.message);
+    if (fase === "terdaftar") {
+      const r = await gateway.cek(p.sesi, nomor);
+      const peta = new Map(r.results.map((x) => [x.phone, x.numberExists]));
+      const hasil = nomor.map((e164) => ({ e164, terdaftar: peta.get(e164) ?? null }));
+      const { error: e3 } = await db.rpc("aawq_simpan_cek_wa", { p_daftar: daftarId, p_hasil: hasil });
+      if (e3) throw new Error(e3.message);
+    } else {
+      const r = await gateway.profil(p.sesi, nomor, { foto: a.cek_foto, bisnis: a.cek_bisnis });
+      const peta = new Map(r.results.map((x) => [x.phone, x]));
+      const hasil = nomor.map((e164) => {
+        const x = peta.get(e164);
+        if (!x || x.status !== "ok") return { e164, sinyal: null, skor: null, alasan: [] };
+        const sinyal = keSinyal(x);
+        const n = nilaiAktivitas(sinyal, a);
+        return { e164, sinyal, skor: n.skor, alasan: n.alasan };
+      });
+      const { error: e3 } = await db.rpc("aawq_simpan_aktif", { p_daftar: daftarId, p_hasil: hasil });
+      if (e3) throw new Error(e3.message);
+    }
     const sekarang = new Date();
     await db
       .from("aawq_pengecek")
@@ -137,7 +197,7 @@ async function kerjakan(p: BarisPengecek, daftarId: string, a: AturanCek, st: { 
       .eq("id", p.id);
     st.berikut = Date.now() + jedaBerikut(a);
   } catch (e) {
-    await db.rpc("aawq_lepas_klaim_wa", { p_daftar: daftarId, p_e164: nomor });
+    await db.rpc(fase === "terdaftar" ? "aawq_lepas_klaim_wa" : "aawq_lepas_klaim_aktif", { p_daftar: daftarId, p_e164: nomor });
     const status = e instanceof GalatGateway ? e.status : 0;
     if (status === 503) {
       // Dibatasi WhatsApp (nomor kontrol tidak terbaca / kueri ditolak): tahan sesuai gateway, minimal 30 menit.
@@ -163,10 +223,11 @@ async function kerjakan(p: BarisPengecek, daftarId: string, a: AturanCek, st: { 
 }
 
 /** Daftar selesai bila tidak ada lagi nomor yang perlu dicek (klaim yang sedang berjalan masih terhitung sisa). */
-export async function selesaikanBilaHabis(daftarId: string): Promise<boolean> {
+export async function selesaikanBilaHabis(daftarId: string, a: Pick<AturanCek, "cek_aktivitas">): Promise<boolean> {
   const db = supabaseAdmin();
   const { data } = await db.rpc("aawq_progres_wa", { p_daftar: daftarId });
-  if ((data as { sisa: number } | null)?.sisa !== 0) return false;
+  const p = data as { sisa: number; aktif_sisa: number } | null;
+  if (!p || p.sisa !== 0 || (a.cek_aktivitas && p.aktif_sisa !== 0)) return false;
   await db.from("aawq_daftar").update({ cek_wa_status: "selesai", cek_wa_selesai_pada: new Date().toISOString() }).eq("id", daftarId).eq("cek_wa_status", "berjalan");
   return true;
 }

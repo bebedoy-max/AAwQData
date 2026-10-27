@@ -137,7 +137,7 @@ export const contohNomor = createServerFn({ method: "GET" })
     await pastikanPemilik(data.daftarId, context.userId);
     let q = supabaseAdmin()
       .from("aawq_nomor")
-      .select("baris, mentah, e164, negara, tipe, alasan, koreksi_dari, skor, kategori")
+      .select("baris, mentah, e164, negara, tipe, alasan, koreksi_dari, skor, kategori, wa, aktif_skor, aktif_sinyal")
       .eq("daftar_id", data.daftarId)
       .order("baris")
       .range(data.halaman * 50, data.halaman * 50 + 49);

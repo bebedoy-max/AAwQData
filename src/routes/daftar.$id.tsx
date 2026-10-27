@@ -9,11 +9,19 @@ import { buatTiketEkspor, contohNomor, detailDaftar, hapusDaftar, selesaikanUngg
 import { ALASAN, type KodeAlasan } from "@/lib/kualitas";
 import { namaNegara } from "@/lib/negara";
 import { teksDurasi } from "@/lib/jadwal-cek";
+import { ATURAN_AKTIF_BAWAAN, nilaiAktivitas, type SinyalWa } from "@/lib/aktivitas";
 import { jedaCekWa, mulaiCekWa, progresCekWa } from "@/lib/pengecek.functions";
 
 export const Route = createFileRoute("/daftar/$id")({ component: Halaman });
 
 type Progres = Awaited<ReturnType<typeof progresCekWa>>;
+
+/** Rincian poin skor aktif (tooltip di tabel tinjau), dihitung ulang dari sinyal mentah. */
+const rincianAktif = (s: SinyalWa) =>
+  nilaiAktivitas(s, ATURAN_AKTIF_BAWAAN)
+    .poin.map((x) => `${x.label}: ${x.keterangan}${x.poin === null ? " (tidak dihitung)" : ` = ${x.poin}`}`)
+    .concat(s.business || s.hosted ? ["Akun bisnis"] : [])
+    .join("\n");
 
 /** Cek terdaftar WhatsApp untuk nomor Siap/Ragu: berjalan di server, kartu ini hanya memantau. */
 function KartuCekWa({ daftarId, onBerubah }: { daftarId: string; onBerubah: () => void }) {
@@ -78,7 +86,9 @@ function KartuCekWa({ daftarId, onBerubah }: { daftarId: string; onBerubah: () =
           </Tombol>
         ) : null}
       </div>
-      <p className="mt-1 text-xs text-redup">Nomor Siap dan Ragu dicek lewat perangkat pengecek; nomor yang tidak terdaftar pindah ke Buang.</p>
+      <p className="mt-1 text-xs text-redup">
+        Nomor Siap dan Ragu dicek lewat perangkat pengecek: tidak terdaftar pindah ke Buang, lalu yang terdaftar diberi skor aktif (perangkat, About, foto, akun bisnis).
+      </p>
       {total ? (
         <div className="mt-3">
           <div className="h-2 overflow-hidden rounded bg-panel-2">
@@ -90,12 +100,25 @@ function KartuCekWa({ daftarId, onBerubah }: { daftarId: string; onBerubah: () =
           </p>
         </div>
       ) : null}
+      {p.cekAktivitas && (p.aktif_dinilai || p.aktif_sisa) ? (
+        <div className="mt-3 border-t border-garis pt-3">
+          <p className="text-sm font-medium">
+            Skor aktif {p.skor_rata !== null ? <span className="text-aksen">rata-rata {p.skor_rata}</span> : null}
+            <span className="text-xs text-redup"> · {angka(p.aktif_dinilai)} dinilai{p.aktif_sisa ? `, ${angka(p.aktif_sisa)} menunggu` : ""}</span>
+          </p>
+          <p className="mt-1 text-sm">
+            <span className="text-siap">{angka(p.aktif_baik)} aktif</span> · <span className="text-ragu">{angka(p.aktif_rendah)} aktivitas rendah</span> ·{" "}
+            <span className="text-buang">{angka(p.tidak_aktif)} kemungkinan tidak aktif</span>
+            {p.bisnis ? <span className="text-ragu"> · {angka(p.bisnis)} akun bisnis</span> : null}
+          </p>
+        </div>
+      ) : null}
       <p className="mt-1 text-xs text-redup">
         {p.status === "selesai"
           ? "Selesai."
           : p.status === "jeda"
             ? "Dijeda."
-            : `Perangkat siap: ${p.perangkatSiap} dari ${p.perangkatTotal}${p.sisa ? ` · perkiraan ${teksDurasi(p.perkiraanDetik)}` : ""}`}
+            : `Perangkat siap: ${p.perangkatSiap} dari ${p.perangkatTotal}${p.sisa || p.aktif_sisa ? ` · perkiraan ${teksDurasi(p.perkiraanDetik)}` : ""}`}
         {!p.perangkatTotal ? " Tambahkan perangkat di menu Pengecek WA." : ""}
       </p>
     </Kartu>
@@ -276,6 +299,7 @@ function Halaman() {
                 <th className="py-1 pr-3">Nomor</th>
                 <th className="py-1 pr-3">Negara</th>
                 <th className="py-1 pr-3">Skor</th>
+                <th className="py-1 pr-3">Aktif</th>
                 <th className="py-1">Alasan</th>
               </tr>
             </thead>
@@ -287,6 +311,9 @@ function Halaman() {
                   <td className="py-1 pr-3 font-mono text-xs">{b.e164 ? `+${b.e164}` : "-"}</td>
                   <td className="py-1 pr-3 text-xs">{b.negara ?? "-"}</td>
                   <td className={`py-1 pr-3 font-mono text-xs ${TEKS_KATEGORI[b.kategori as Kat]}`}>{b.skor}</td>
+                  <td className="py-1 pr-3 font-mono text-xs" title={b.aktif_sinyal ? rincianAktif(b.aktif_sinyal as SinyalWa) : undefined}>
+                    {b.aktif_skor ?? (b.wa === true ? "…" : b.wa === false ? "✕" : "-")}
+                  </td>
                   <td className="py-1 text-xs text-redup">{(b.alasan as string[]).map((a) => ALASAN[a as KodeAlasan]?.label ?? a).join(", ") || "-"}</td>
                 </tr>
               ))}

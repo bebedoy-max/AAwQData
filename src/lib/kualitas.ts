@@ -28,7 +28,10 @@ export type KodeAlasan =
   | "duplikat"
   | "deret_berurutan"
   | "tidak_terdaftar_wa"
-  | "wa_tidak_pasti";
+  | "wa_tidak_pasti"
+  | "aktivitas_rendah"
+  | "kemungkinan_tidak_aktif"
+  | "akun_bisnis";
 
 export interface InfoAlasan {
   label: string;
@@ -64,6 +67,19 @@ export const ALASAN: Record<KodeAlasan, InfoAlasan> = {
   },
   tidak_terdaftar_wa: { label: "Tidak terdaftar WhatsApp", bobot: 100, kategori: "buang", penjelasan: "Server WhatsApp menjawab nomor ini tidak memakai WhatsApp (dicek dengan perangkat pengecek)." },
   wa_tidak_pasti: { label: "WhatsApp tidak pasti", bobot: 10, kategori: "ragu", penjelasan: "Tiga kali dicek tetapi server WhatsApp tidak memberi jawaban pasti." },
+  aktivitas_rendah: {
+    label: "Aktivitas rendah",
+    bobot: 20,
+    kategori: "ragu",
+    penjelasan: "Skor aktif di bawah ambang Ragu: perangkat lama tidak berubah, About bawaan/lama, atau tanpa foto profil.",
+  },
+  kemungkinan_tidak_aktif: {
+    label: "Kemungkinan tidak aktif",
+    bobot: 100,
+    kategori: "buang",
+    penjelasan: "Skor aktif di bawah ambang Buang: hampir semua sinyal yang terbaca menunjukkan akun terbengkalai.",
+  },
+  akun_bisnis: { label: "Akun bisnis", bobot: 30, kategori: "ragu", penjelasan: "Akun WhatsApp Business atau akun API (hosted), bukan akun pribadi." },
 };
 
 export interface OpsiCek {
