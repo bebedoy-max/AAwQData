@@ -26,7 +26,9 @@ export type KodeAlasan =
   | "pola_berulang"
   | "pola_urut"
   | "duplikat"
-  | "deret_berurutan";
+  | "deret_berurutan"
+  | "tidak_terdaftar_wa"
+  | "wa_tidak_pasti";
 
 export interface InfoAlasan {
   label: string;
@@ -60,6 +62,8 @@ export const ALASAN: Record<KodeAlasan, InfoAlasan> = {
     kategori: "ragu",
     penjelasan: "Bagian dari deret nomor yang berselisih 1 (…001, …002, …003); ciri daftar hasil generator, bukan pengguna nyata.",
   },
+  tidak_terdaftar_wa: { label: "Tidak terdaftar WhatsApp", bobot: 100, kategori: "buang", penjelasan: "Server WhatsApp menjawab nomor ini tidak memakai WhatsApp (dicek dengan perangkat pengecek)." },
+  wa_tidak_pasti: { label: "WhatsApp tidak pasti", bobot: 10, kategori: "ragu", penjelasan: "Tiga kali dicek tetapi server WhatsApp tidak memberi jawaban pasti." },
 };
 
 export interface OpsiCek {

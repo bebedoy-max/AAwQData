@@ -51,4 +51,5 @@ export interface BarisDaftar {
   galat: string | null;
   dibuat: string;
   selesai_pada: string | null;
+  cek_wa_status: "belum" | "berjalan" | "jeda" | "selesai";
 }

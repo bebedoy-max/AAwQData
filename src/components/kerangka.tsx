@@ -32,7 +32,14 @@ export function Kerangka({ judul, aksi, children }: { judul?: ReactNode; aksi?: 
             <ShieldCheck className="size-5 text-aksen" aria-hidden />
             AAwQData
           </Link>
-          <span className="hidden text-xs text-redup sm:inline">Kualitas nomor target</span>
+          <nav className="ml-2 flex gap-1 text-sm">
+            <Link to="/daftar" className="rounded-md px-2 py-1 text-redup hover:text-teks" activeProps={{ className: "text-teks" }}>
+              Daftar
+            </Link>
+            <Link to="/pengecek" className="rounded-md px-2 py-1 text-redup hover:text-teks" activeProps={{ className: "text-teks" }}>
+              Pengecek WA
+            </Link>
+          </nav>
           <span className="flex-1" />
           {email ? <span className="hidden text-xs text-redup md:inline">{email}</span> : null}
           <button

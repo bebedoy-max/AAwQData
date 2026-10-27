@@ -1,10 +1,14 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ALASAN, type KodeAlasan } from "./kualitas";
 
 // Skor ulang tingkat daftar dihitung di database (aawq_bobot/aawq_kategori). Tes ini menjaga bobot dan kategori
 // di migrasi tetap sama dengan mesin kualitas.
-const sql = readFileSync(new URL("../../db/migrations/001_awal.sql", import.meta.url), "utf8");
+// Definisi TERBARU di antara semua migrasi (create or replace berikutnya menimpa yang lama).
+const folder = new URL("../../db/migrations/", import.meta.url);
+const semua = readdirSync(folder).filter((f) => f.endsWith(".sql")).sort().map((f) => readFileSync(new URL(f, folder), "utf8")).join("\n");
+const terakhir = (nama: string) => semua.split(`create or replace function public.${nama}(`).at(-1) ?? "";
+const sql = `${terakhir("aawq_bobot").split("$$")[1] ?? ""}${terakhir("aawq_kategori").split("$$")[1] ?? ""}`;
 
 describe("bobot SQL selaras dengan ALASAN", () => {
   const bobotSql = Object.fromEntries([...sql.matchAll(/when '([a-z_]+)' then (\d+)/g)].map((m) => [m[1], Number(m[2])]));

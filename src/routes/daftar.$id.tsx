@@ -8,8 +8,99 @@ import { BatangKategori, Kartu, LABEL_KATEGORI, TEKS_KATEGORI, Tombol, angka, pe
 import { buatTiketEkspor, contohNomor, detailDaftar, hapusDaftar, selesaikanUnggah } from "@/lib/daftar.functions";
 import { ALASAN, type KodeAlasan } from "@/lib/kualitas";
 import { namaNegara } from "@/lib/negara";
+import { teksDurasi } from "@/lib/jadwal-cek";
+import { jedaCekWa, mulaiCekWa, progresCekWa } from "@/lib/pengecek.functions";
 
 export const Route = createFileRoute("/daftar/$id")({ component: Halaman });
+
+type Progres = Awaited<ReturnType<typeof progresCekWa>>;
+
+/** Cek terdaftar WhatsApp untuk nomor Siap/Ragu: berjalan di server, kartu ini hanya memantau. */
+function KartuCekWa({ daftarId, onBerubah }: { daftarId: string; onBerubah: () => void }) {
+  const fnProgres = useServerFn(progresCekWa);
+  const fnMulai = useServerFn(mulaiCekWa);
+  const fnJeda = useServerFn(jedaCekWa);
+  const [p, setP] = useState<Progres | null>(null);
+  const [sibuk, setSibuk] = useState(false);
+
+  const muat = useCallback(
+    () =>
+      fnProgres({ data: { daftarId } })
+        .then((x) => {
+          setP((lama) => {
+            // Angka kategori ikut berubah selama cek berjalan: segarkan ringkasan daftar.
+            if (lama && (lama.terdaftar !== x.terdaftar || lama.tidak_terdaftar !== x.tidak_terdaftar)) onBerubah();
+            return x;
+          });
+        })
+        .catch((e: Error) => toast.error(e.message)),
+    [fnProgres, daftarId, onBerubah],
+  );
+  useEffect(() => {
+    void muat();
+  }, [muat]);
+  useEffect(() => {
+    if (p?.status !== "berjalan") return;
+    const t = setInterval(() => void muat(), 5000);
+    return () => clearInterval(t);
+  }, [p?.status, muat]);
+
+  if (!p) return null;
+  const dicek = p.terdaftar + p.tidak_terdaftar + p.tidak_pasti;
+  const total = dicek + p.sisa;
+  const aksi = async (fn: () => Promise<unknown>) => {
+    setSibuk(true);
+    try {
+      await fn();
+      await muat();
+      onBerubah();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSibuk(false);
+    }
+  };
+
+  return (
+    <Kartu className="mt-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="flex-1 font-semibold">Cek terdaftar WhatsApp</h2>
+        {p.status === "berjalan" ? (
+          <Tombol disabled={sibuk} onClick={() => void aksi(() => fnJeda({ data: { daftarId } }))}>
+            Jeda
+          </Tombol>
+        ) : p.sisa > 0 || p.status === "belum" ? (
+          <Tombol varian="utama" disabled={sibuk} onClick={() => void aksi(async () => {
+            const r = await fnMulai({ data: { daftarId } });
+            if (r.dariCache) toast.success(`${angka(r.dariCache)} nomor memakai hasil cek sebelumnya`);
+          })}>
+            {p.status === "jeda" ? "Lanjutkan cek" : "Mulai cek WhatsApp"}
+          </Tombol>
+        ) : null}
+      </div>
+      <p className="mt-1 text-xs text-redup">Nomor Siap dan Ragu dicek lewat perangkat pengecek; nomor yang tidak terdaftar pindah ke Buang.</p>
+      {total ? (
+        <div className="mt-3">
+          <div className="h-2 overflow-hidden rounded bg-panel-2">
+            <div className="h-full bg-aksen transition-all" style={{ width: `${(dicek / total) * 100}%` }} />
+          </div>
+          <p className="mt-2 text-sm">
+            {angka(dicek)} / {angka(total)} dicek · <span className="text-siap">{angka(p.terdaftar)} terdaftar</span> · <span className="text-buang">{angka(p.tidak_terdaftar)} tidak terdaftar</span>
+            {p.tidak_pasti ? <span className="text-ragu"> · {angka(p.tidak_pasti)} tidak pasti</span> : null}
+          </p>
+        </div>
+      ) : null}
+      <p className="mt-1 text-xs text-redup">
+        {p.status === "selesai"
+          ? "Selesai."
+          : p.status === "jeda"
+            ? "Dijeda."
+            : `Perangkat siap: ${p.perangkatSiap} dari ${p.perangkatTotal}${p.sisa ? ` · perkiraan ${teksDurasi(p.perkiraanDetik)}` : ""}`}
+        {!p.perangkatTotal ? " Tambahkan perangkat di menu Pengecek WA." : ""}
+      </p>
+    </Kartu>
+  );
+}
 
 type Detail = Awaited<ReturnType<typeof detailDaftar>>;
 type Contoh = Awaited<ReturnType<typeof contohNomor>>;
@@ -122,6 +213,8 @@ function Halaman() {
           })}
         </div>
       </div>
+
+      {d.status === "selesai" ? <KartuCekWa daftarId={id} onBerubah={muat} /> : null}
 
       <div className="mt-4 grid gap-4 md:grid-cols-[1fr_260px]">
         <Kartu>

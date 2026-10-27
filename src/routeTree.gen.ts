@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MasukRouteImport } from './routes/masuk'
+import { Route as PengecekRouteImport } from './routes/pengecek'
 import { Route as DaftarIndexRouteImport } from './routes/daftar.index'
 import { Route as DaftarIdRouteImport } from './routes/daftar.$id'
 import { Route as DaftarBaruRouteImport } from './routes/daftar.baru'
@@ -24,6 +25,11 @@ const IndexRoute = IndexRouteImport.update({
 const MasukRoute = MasukRouteImport.update({
   id: '/masuk',
   path: '/masuk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PengecekRoute = PengecekRouteImport.update({
+  id: '/pengecek',
+  path: '/pengecek',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DaftarIndexRoute = DaftarIndexRouteImport.update({
@@ -50,6 +56,7 @@ const ApiEksporTiketRoute = ApiEksporTiketRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/masuk': typeof MasukRoute
+  '/pengecek': typeof PengecekRoute
   '/daftar/$id': typeof DaftarIdRoute
   '/daftar/baru': typeof DaftarBaruRoute
   '/daftar/': typeof DaftarIndexRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/masuk': typeof MasukRoute
+  '/pengecek': typeof PengecekRoute
   '/daftar/$id': typeof DaftarIdRoute
   '/daftar/baru': typeof DaftarBaruRoute
   '/daftar': typeof DaftarIndexRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/masuk': typeof MasukRoute
+  '/pengecek': typeof PengecekRoute
   '/daftar/$id': typeof DaftarIdRoute
   '/daftar/baru': typeof DaftarBaruRoute
   '/daftar/': typeof DaftarIndexRoute
@@ -77,6 +86,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/masuk'
+    | '/pengecek'
     | '/daftar/$id'
     | '/daftar/baru'
     | '/daftar/'
@@ -85,6 +95,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/masuk'
+    | '/pengecek'
     | '/daftar/$id'
     | '/daftar/baru'
     | '/daftar'
@@ -93,6 +104,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/masuk'
+    | '/pengecek'
     | '/daftar/$id'
     | '/daftar/baru'
     | '/daftar/'
@@ -102,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   MasukRoute: typeof MasukRoute
+  PengecekRoute: typeof PengecekRoute
   DaftarIdRoute: typeof DaftarIdRoute
   DaftarBaruRoute: typeof DaftarBaruRoute
   DaftarIndexRoute: typeof DaftarIndexRoute
@@ -122,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/masuk'
       fullPath: '/masuk'
       preLoaderRoute: typeof MasukRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pengecek': {
+      id: '/pengecek'
+      path: '/pengecek'
+      fullPath: '/pengecek'
+      preLoaderRoute: typeof PengecekRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/daftar/': {
@@ -158,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   MasukRoute: MasukRoute,
+  PengecekRoute: PengecekRoute,
   DaftarIdRoute: DaftarIdRoute,
   DaftarBaruRoute: DaftarBaruRoute,
   DaftarIndexRoute: DaftarIndexRoute,
