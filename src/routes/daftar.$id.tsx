@@ -24,7 +24,7 @@ const rincianAktif = (s: SinyalWa) =>
     .join("\n");
 
 /** Cek terdaftar WhatsApp untuk nomor Siap/Ragu: berjalan di server, kartu ini hanya memantau. */
-function KartuCekWa({ daftarId, onBerubah }: { daftarId: string; onBerubah: () => void }) {
+function KartuCekWa({ daftarId, onBerubah, onUnduh }: { daftarId: string; onBerubah: () => void; onUnduh: (format: "lengkap" | "nomor") => void }) {
   const fnProgres = useServerFn(progresCekWa);
   const fnMulai = useServerFn(mulaiCekWa);
   const fnJeda = useServerFn(jedaCekWa);
@@ -98,6 +98,16 @@ function KartuCekWa({ daftarId, onBerubah }: { daftarId: string; onBerubah: () =
             {angka(dicek)} / {angka(total)} dicek · <span className="text-siap">{angka(p.terdaftar)} terdaftar</span> · <span className="text-buang">{angka(p.tidak_terdaftar)} tidak terdaftar</span>
             {p.tidak_pasti ? <span className="text-ragu"> · {angka(p.tidak_pasti)} tidak pasti</span> : null}
           </p>
+          {p.terdaftar ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Tombol onClick={() => onUnduh("nomor")}>
+                <Download className="size-4" /> Terdaftar WA: nomor saja (CSV)
+              </Tombol>
+              <Tombol onClick={() => onUnduh("lengkap")}>
+                <Download className="size-4" /> Terdaftar WA: lengkap
+              </Tombol>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {p.cekAktivitas && (p.aktif_dinilai || p.aktif_sisa) ? (
@@ -157,7 +167,7 @@ function Halaman() {
       .catch((e: Error) => toast.error(e.message));
   }, [fnContoh, id, saring, halaman]);
 
-  async function unduh(kategori: Kat | "semua", format: "lengkap" | "nomor") {
+  async function unduh(kategori: Kat | "semua" | "terdaftar", format: "lengkap" | "nomor") {
     try {
       const { url } = await fnTiket({ data: { daftarId: id, kategori, format } });
       const a = document.createElement("a");
@@ -237,7 +247,7 @@ function Halaman() {
         </div>
       </div>
 
-      {d.status === "selesai" ? <KartuCekWa daftarId={id} onBerubah={muat} /> : null}
+      {d.status === "selesai" ? <KartuCekWa daftarId={id} onBerubah={muat} onUnduh={(f) => void unduh("terdaftar", f)} /> : null}
 
       <div className="mt-4 grid gap-4 md:grid-cols-[1fr_260px]">
         <Kartu>

@@ -165,7 +165,7 @@ export const hapusDaftar = createServerFn({ method: "POST" })
  */
 export const buatTiketEkspor = createServerFn({ method: "POST" })
   .middleware([wajibMasuk])
-  .inputValidator(z.object({ daftarId: z.string().uuid(), kategori: z.enum([...KATEGORI, "semua"]), format: z.enum(["lengkap", "nomor"]).default("lengkap") }))
+  .inputValidator(z.object({ daftarId: z.string().uuid(), kategori: z.enum([...KATEGORI, "semua", "terdaftar"]), format: z.enum(["lengkap", "nomor"]).default("lengkap") }))
   .handler(async ({ data, context }) => {
     const { pastikanPemilik } = await import("./supabase.server");
     const { buatTiket } = await import("./ekspor.server");

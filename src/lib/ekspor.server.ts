@@ -5,7 +5,8 @@ import { supabaseAdmin } from "./supabase.server";
 interface Tiket {
   daftarId: string;
   nama: string;
-  kategori: "siap" | "ragu" | "buang" | "semua";
+  /** "terdaftar" = semua nomor yang terdaftar WhatsApp (wa = true), apa pun kategorinya. */
+  kategori: "siap" | "ragu" | "buang" | "semua" | "terdaftar";
   format: "lengkap" | "nomor" | "laporan";
   userId: string;
   habis: number;
@@ -54,7 +55,8 @@ export function aliranCsv(t: Tiket): ReadableStream<Uint8Array> {
         .gt("id", terakhir)
         .order("id")
         .limit(5000);
-      if (t.kategori !== "semua") q = q.eq("kategori", t.kategori);
+      if (t.kategori === "terdaftar") q = q.eq("wa", true);
+      else if (t.kategori !== "semua") q = q.eq("kategori", t.kategori);
       if (t.format === "nomor") q = q.not("e164", "is", null);
       const { data, error } = await q;
       if (error) {
