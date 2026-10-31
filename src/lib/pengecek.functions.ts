@@ -265,7 +265,7 @@ export const progresCekWa = createServerFn({ method: "GET" })
     };
   });
 
-/** Nyalakan/matikan semua perangkat WSPRO yang tersambung sebagai reader sekaligus. */
+/** Lepaskan semua perangkat reader WSPRO ke posisi nonaktif sementara. */
 export const aturSemuaWspro = createServerFn({ method: "POST" })
   .middleware([wajibMasuk])
   .inputValidator(z.object({ aktif: z.boolean() }))
@@ -276,6 +276,32 @@ export const aturSemuaWspro = createServerFn({ method: "POST" })
     const { error } = await q;
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+/**
+ * Segarkan reader WSPRO: sinkronkan ke keadaan gateway, lalu jadikan reader PERSIS perangkat yang sedang tersambung
+ * dan tidak sedang dibatasi WhatsApp. Perangkat yang terputus dibuang dari daftar (muncul lagi bila tersambung
+ * kembali), perangkat yang dibatasi dinonaktifkan. Jadi jumlah reader dinamis tiap kali ditekan.
+ */
+export const segarkanReaderWspro = createServerFn({ method: "POST" })
+  .middleware([wajibMasuk])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("./supabase.server");
+    const { sinkronWspro } = await import("./cek-wa.server");
+    const uid = context.userId;
+    const sync = await sinkronWspro(uid);
+    const db = supabaseAdmin();
+    const sekarang = new Date().toISOString();
+    // 1) Buang perangkat yang tidak lagi tersambung (akan masuk lagi otomatis bila tersambung kembali).
+    const { error: e1, count: dibuang } = await db.from("aawq_pengecek").delete({ count: "exact" }).eq("user_id", uid).eq("sumber", "aabaileys").neq("status", "WORKING");
+    if (e1) throw new Error(e1.message);
+    // 2) Aktifkan semua yang tersambung sebagai reader, lalu matikan yang sedang dibatasi WhatsApp.
+    const { error: e2 } = await db.from("aawq_pengecek").update({ aktif: true }).eq("user_id", uid).eq("sumber", "aabaileys").eq("status", "WORKING");
+    if (e2) throw new Error(e2.message);
+    const { error: e3 } = await db.from("aawq_pengecek").update({ aktif: false }).eq("user_id", uid).eq("sumber", "aabaileys").gt("ditahan_sampai", sekarang);
+    if (e3) throw new Error(e3.message);
+    const { count: reader } = await db.from("aawq_pengecek").select("id", { count: "exact", head: true }).eq("user_id", uid).eq("sumber", "aabaileys").eq("aktif", true);
+    return { reader: reader ?? 0, dibuang: dibuang ?? 0, galat: sync.galat };
   });
 
 /** Menu Pengaturan: sumber reader yang dipakai + status konfigurasi tiap sumber di server. */

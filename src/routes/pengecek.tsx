@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Kerangka } from "@/components/kerangka";
 import { Kartu, Tombol, angka } from "@/components/ui";
 import { cekHariIni } from "@/lib/jadwal-cek";
-import { aturSemuaWspro, daftarPengecek, hapusPengecek, kodePairing, simpanAturan, statusPemasangan, tambahPengecek, ubahPengecek } from "@/lib/pengecek.functions";
+import { aturSemuaWspro, daftarPengecek, hapusPengecek, kodePairing, segarkanReaderWspro, simpanAturan, statusPemasangan, tambahPengecek, ubahPengecek } from "@/lib/pengecek.functions";
 
 export const Route = createFileRoute("/pengecek")({ component: Halaman });
 
@@ -21,6 +21,8 @@ function Halaman() {
   const fnUbah = useServerFn(ubahPengecek);
   const fnHapus = useServerFn(hapusPengecek);
   const fnSemua = useServerFn(aturSemuaWspro);
+  const fnSegarkan = useServerFn(segarkanReaderWspro);
+  const [segarSibuk, setSegarSibuk] = useState(false);
   const [data, setData] = useState<Data | null>(null);
   const [pasang, setPasang] = useState<string | null>(null);
   const [nama, setNama] = useState("");
@@ -145,17 +147,33 @@ function Halaman() {
                 <Tombol
                   varian="utama"
                   className="text-xs"
+                  disabled={segarSibuk}
                   onClick={() => {
-                    if (!confirm("Pakai SEMUA perangkat WSPRO yang tersambung sebagai reader?")) return;
-                    void fnSemua({ data: { aktif: true } }).then(muat, (e: Error) => toast.error(e.message));
+                    setSegarSibuk(true);
+                    void fnSegarkan()
+                      .then((r) => {
+                        toast.success(`${r.reader} reader tersambung${r.dibuang ? ` · ${r.dibuang} terputus dibuang` : ""}`);
+                        return muat();
+                      })
+                      .catch((e: Error) => toast.error(e.message))
+                      .finally(() => setSegarSibuk(false));
                   }}
                 >
-                  Aktifkan semua
+                  <RotateCcw className="size-3" /> {segarSibuk ? "Menyegarkan…" : "Refresh"}
                 </Tombol>
-                <Tombol className="text-xs" onClick={() => void fnSemua({ data: { aktif: false } }).then(muat, (e: Error) => toast.error(e.message))}>
-                  Nonaktifkan semua
+                <Tombol
+                  className="text-xs"
+                  onClick={() => {
+                    if (!confirm("Lepaskan SEMUA perangkat reader ke posisi nonaktif sementara?")) return;
+                    void fnSemua({ data: { aktif: false } }).then(muat, (e: Error) => toast.error(e.message));
+                  }}
+                >
+                  Lepaskan semua
                 </Tombol>
               </div>
+              <p className="mt-2 text-xs text-redup">
+                Refresh: buang perangkat yang terputus atau dibatasi WhatsApp, lalu aktifkan semua yang baru tersambung sebagai reader (jumlah berubah dinamis). Lepaskan semua: nonaktifkan semua reader sementara.
+              </p>
             </Kartu>
           ) : (
             <Kartu>
