@@ -165,10 +165,17 @@ export const hapusDaftar = createServerFn({ method: "POST" })
  */
 export const buatTiketEkspor = createServerFn({ method: "POST" })
   .middleware([wajibMasuk])
-  .inputValidator(z.object({ daftarId: z.string().uuid(), kategori: z.enum([...KATEGORI, "semua", "terdaftar", "aktif"]), format: z.enum(["lengkap", "nomor"]).default("lengkap") }))
+  .inputValidator(z.object({ daftarId: z.string().uuid(), kategori: z.enum([...KATEGORI, "semua", "terdaftar", "aktif", "grade_a", "grade_b", "grade_c"]), format: z.enum(["lengkap", "nomor"]).default("lengkap") }))
   .handler(async ({ data, context }) => {
     const { pastikanPemilik } = await import("./supabase.server");
     const { buatTiket } = await import("./ekspor.server");
     const daftar = await pastikanPemilik(data.daftarId, context.userId);
-    return { url: `/api/ekspor/${buatTiket({ daftarId: daftar.id, nama: daftar.nama, kategori: data.kategori, format: data.format, userId: context.userId })}` };
+    // Batas grade dihitung sekarang dari pengaturan pemilik (dipakai filter grade dan kolom grade unduhan lengkap).
+    const { aturanPengguna } = await import("./cek-wa.server");
+    const a = await aturanPengguna(context.userId);
+    const batasA = new Date(Date.now() - a.grade_a_hari * 86_400_000).toISOString();
+    const batasB = new Date(Date.now() - a.grade_b_hari * 86_400_000).toISOString();
+    return {
+      url: `/api/ekspor/${buatTiket({ daftarId: daftar.id, nama: daftar.nama, kategori: data.kategori, format: data.format, userId: context.userId, batasA, batasB })}`,
+    };
   });

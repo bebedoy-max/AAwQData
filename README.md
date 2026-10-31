@@ -77,6 +77,21 @@ yang dibaca gateway lewat Baileys (`POST /api/contacts/profile-batch`). Sinyal y
   (`whatsapp`, `skor_aktif`).
 - Bobot dan ambang adalah titik awal: perlu dikalibrasi dengan hasil kirim nyata dari WSPRO.
 
+## Grade aktivitas (A/B/C)
+
+Nomor terdaftar yang sudah diberi skor aktif dibagi menurut **aktivitas terakhir yang terbaca**: tanggal paling baru
+dari perangkat terakhir berubah, About diubah, dan pesan sementara diatur.
+
+| Grade | Arti (bawaan, bisa diatur di Pengaturan) |
+| --- | --- |
+| **A** | aktivitas terakhir ≤ 3 hari: paling pasti dipegang dan dipakai pemiliknya |
+| **B** | aktivitas terakhir ≤ 30 hari |
+| **C** | lebih lama, atau tidak ada tanggal yang terbaca |
+
+WhatsApp tidak memberi tanda "dipakai hari ini"; nomor yang dipakai tiap hari tanpa mengubah perangkat/profil masuk B/C.
+Tiap grade bisa diunduh (nomor saja atau lengkap); unduhan lengkap memuat kolom `aktivitas_terakhir` dan `grade`.
+Butuh migrasi `007_grade_aktif.sql`.
+
 ## Laporan Bio
 
 Menu **Laporan Bio** merangkum satu daftar dari hasil cek WhatsApp yang sudah tersimpan (tanpa kueri tambahan):
@@ -105,7 +120,7 @@ TanStack Start + React + Tailwind (sama dengan WSPRO, tanpa Lovable), Supabase s
 ## Pemasangan
 
 1. **Supabase baru** (self-hosted, terpisah dari WSPRO). Jalankan `db/migrations/001_awal.sql` lalu
-   `002_cek_whatsapp.sql`, `003_skor_aktif.sql`, `004_batas_waktu.sql`, `005_laporan_bio.sql`, `006_sumber_reader.sql` di SQL editor.
+   `002_cek_whatsapp.sql`, `003_skor_aktif.sql`, `004_batas_waktu.sql`, `005_laporan_bio.sql`, `006_sumber_reader.sql`, `007_grade_aktif.sql` di SQL editor.
    Migrasi bersifat aditif dan aman dijalankan ulang; migrasi berikutnya selalu berkas baru.
 2. **Pengguna**: buat akun di Supabase > Authentication > Users (email + sandi). Matikan pendaftaran publik
    (Authentication > Providers > Email > *Allow new users to sign up*), karena aplikasi ini hanya untuk pemilik.

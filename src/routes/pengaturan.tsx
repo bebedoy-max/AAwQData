@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Kerangka } from "@/components/kerangka";
 import { Kartu, Tombol } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { bacaPengaturanSumber, simpanSumber } from "@/lib/pengecek.functions";
+import { bacaPengaturanSumber, simpanGrade, simpanSumber } from "@/lib/pengecek.functions";
 
 export const Route = createFileRoute("/pengaturan")({ component: Halaman });
 
@@ -28,6 +28,9 @@ const PILIHAN: Array<{ id: Sumber; judul: string; isi: string }> = [
 function Halaman() {
   const fnBaca = useServerFn(bacaPengaturanSumber);
   const fnSimpan = useServerFn(simpanSumber);
+  const fnGrade = useServerFn(simpanGrade);
+  const [gA, setGA] = useState(3);
+  const [gB, setGB] = useState(30);
   const [data, setData] = useState<Data | null>(null);
   const [pilih, setPilih] = useState<Sumber>("nq");
   const [simpan, setSimpan] = useState(false);
@@ -37,6 +40,8 @@ function Halaman() {
       .then((d) => {
         setData(d);
         setPilih(d.sumber);
+        setGA(d.grade.a);
+        setGB(d.grade.b);
       })
       .catch((e: Error) => toast.error(e.message));
   }, [fnBaca]);
@@ -87,6 +92,36 @@ function Halaman() {
         </div>
         <Tombol varian="utama" className="mt-4" disabled={!data || simpan || pilih === data.sumber} onClick={() => void terapkan()}>
           Simpan
+        </Tombol>
+      </Kartu>
+
+      <Kartu className="mt-4 max-w-3xl">
+        <h2 className="font-semibold">Grade aktivitas</h2>
+        <p className="mt-1 text-sm text-redup">
+          Nomor terdaftar yang sudah dinilai dibagi menurut aktivitas terakhir yang terbaca dari WhatsApp (perangkat terakhir berubah, About diubah, pesan sementara
+          diatur). WhatsApp tidak memberi tanda "dipakai hari ini": Grade A berarti ada perubahan yang baru saja terjadi, jadi paling pasti dipegang pemiliknya.
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm text-redup">
+            Grade A: aktivitas paling lama (hari)
+            <input type="number" min={1} value={gA} onChange={(e) => setGA(Number(e.target.value))} className="mt-1 w-full rounded-md border border-garis bg-panel-2 px-3 py-1.5 text-teks" />
+          </label>
+          <label className="block text-sm text-redup">
+            Grade B: aktivitas paling lama (hari)
+            <input type="number" min={2} value={gB} onChange={(e) => setGB(Number(e.target.value))} className="mt-1 w-full rounded-md border border-garis bg-panel-2 px-3 py-1.5 text-teks" />
+          </label>
+        </div>
+        <p className="mt-2 text-xs text-redup">Grade C = sudah dinilai tetapi aktivitas terakhirnya lebih lama dari batas B, atau tidak ada tanggal yang terbaca.</p>
+        <Tombol
+          className="mt-3"
+          onClick={() =>
+            void fnGrade({ data: { a: gA, b: gB } }).then(
+              () => (toast.success("Batas grade disimpan"), muat()),
+              (e: Error) => toast.error(e.message),
+            )
+          }
+        >
+          Simpan grade
         </Tombol>
       </Kartu>
     </Kerangka>

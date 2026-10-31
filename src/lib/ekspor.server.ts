@@ -10,8 +10,11 @@ interface Tiket {
    * "aktif" = nomor bernilai skor aktif yang tidak bertanda aktivitas rendah / kemungkinan tidak aktif
    * (sama dengan angka "aktif" di kartu Skor aktif, aawq_progres_wa.aktif_baik).
    */
-  kategori: "siap" | "ragu" | "buang" | "semua" | "terdaftar" | "aktif";
+  kategori: "siap" | "ragu" | "buang" | "semua" | "terdaftar" | "aktif" | "grade_a" | "grade_b" | "grade_c";
   format: "lengkap" | "nomor" | "laporan";
+  /** Batas grade (ISO): aktivitas terakhir >= batasA = A, >= batasB = B, selebihnya C. */
+  batasA?: string;
+  batasB?: string;
   userId: string;
   habis: number;
 }
@@ -39,6 +42,18 @@ export function selCsv(v: unknown): string {
 
 const labelAlasan = (a: string[]) => a.map((x) => ALASAN[x as KodeAlasan]?.label ?? x).join("; ");
 
+const kolomEkspor = (t: Tiket): string =>
+  `id, baris, mentah, e164, negara, tipe, kategori, skor, alasan, koreksi_dari, wa, aktif_skor, aktif_dinilai${t.batasA ? ", aktif_terakhir" : ""}`;
+
+/** Grade satu baris untuk kolom unduhan lengkap ("" bila belum dinilai atau batas grade tidak dikirim). */
+function gradeBaris(r: { aktif_dinilai?: boolean | null; aktif_skor?: number | null; aktif_terakhir?: string | null }, t: Tiket): string {
+  if (!t.batasA || !t.batasB || !r.aktif_dinilai || r.aktif_skor === null || r.aktif_skor === undefined) return "";
+  const w = r.aktif_terakhir ? Date.parse(r.aktif_terakhir) : NaN;
+  if (Number.isFinite(w) && w >= Date.parse(t.batasA)) return "A";
+  if (Number.isFinite(w) && w >= Date.parse(t.batasB)) return "B";
+  return "C";
+}
+
 /** Alirkan CSV per 5.000 baris (keyset pada id) sampai habis: tanpa batas jumlah baris. */
 export function aliranCsv(t: Tiket): ReadableStream<Uint8Array> {
   const enc = new TextEncoder();
@@ -48,19 +63,33 @@ export function aliranCsv(t: Tiket): ReadableStream<Uint8Array> {
     async pull(ctrl) {
       if (mulai) {
         mulai = false;
+        // Sebelum migrasi 007 kolom aktif_terakhir belum ada: unduhan biasa tetap jalan tanpa kolom grade.
+        if (t.batasA && !t.kategori.startsWith("grade_")) {
+          const { error: cekKolom } = await supabaseAdmin().from("aawq_nomor").select("aktif_terakhir").limit(1);
+          if (cekKolom) {
+            delete t.batasA;
+            delete t.batasB;
+          }
+        }
         // BOM agar Excel membaca UTF-8 dengan benar.
-        ctrl.enqueue(enc.encode(t.format === "nomor" ? "﻿nomor\n" : "﻿baris,mentah,nomor,negara,tipe,kategori,skor,alasan,koreksi_dari,whatsapp,skor_aktif\n"));
+        ctrl.enqueue(enc.encode(t.format === "nomor" ? "﻿nomor\n" : "﻿baris,mentah,nomor,negara,tipe,kategori,skor,alasan,koreksi_dari,whatsapp,skor_aktif,aktivitas_terakhir,grade\n"));
         return;
       }
       let q = supabaseAdmin()
         .from("aawq_nomor")
-        .select("id, baris, mentah, e164, negara, tipe, kategori, skor, alasan, koreksi_dari, wa, aktif_skor")
+        // Kolom aktif_terakhir (migrasi 007) hanya diminta bila batas grade dikirim.
+        .select(kolomEkspor(t) as "*")
         .eq("daftar_id", t.daftarId)
         .gt("id", terakhir)
         .order("id")
         .limit(5000);
       if (t.kategori === "terdaftar") q = q.eq("wa", true);
-      else if (t.kategori === "aktif") {
+      else if (t.kategori === "grade_a" || t.kategori === "grade_b" || t.kategori === "grade_c") {
+        q = q.eq("aktif_dinilai", true).not("aktif_skor", "is", null);
+        if (t.kategori === "grade_a") q = q.gte("aktif_terakhir", t.batasA!);
+        else if (t.kategori === "grade_b") q = q.lt("aktif_terakhir", t.batasA!).gte("aktif_terakhir", t.batasB!);
+        else q = q.or(`aktif_terakhir.is.null,aktif_terakhir.lt.${t.batasB!}`);
+      } else if (t.kategori === "aktif") {
         q = q.eq("aktif_dinilai", true).not("aktif_skor", "is", null).not("alasan", "ov", "{aktivitas_rendah,kemungkinan_tidak_aktif}");
       }
       else if (t.kategori !== "semua") q = q.eq("kategori", t.kategori);
@@ -80,7 +109,23 @@ export function aliranCsv(t: Tiket): ReadableStream<Uint8Array> {
         .map((r) =>
           t.format === "nomor"
             ? selCsv(r.e164)
-            : [r.baris, r.mentah, r.e164, r.negara, r.tipe, r.kategori, r.skor, labelAlasan(r.alasan ?? []), r.koreksi_dari, r.wa === true ? "terdaftar" : r.wa === false ? "tidak terdaftar" : "", r.aktif_skor].map(selCsv).join(","),
+            : [
+                r.baris,
+                r.mentah,
+                r.e164,
+                r.negara,
+                r.tipe,
+                r.kategori,
+                r.skor,
+                labelAlasan(r.alasan ?? []),
+                r.koreksi_dari,
+                r.wa === true ? "terdaftar" : r.wa === false ? "tidak terdaftar" : "",
+                r.aktif_skor,
+                r.aktif_terakhir ?? "",
+                gradeBaris(r, t),
+              ]
+                .map(selCsv)
+                .join(","),
         )
         .join("\n");
       ctrl.enqueue(enc.encode(teks + "\n"));

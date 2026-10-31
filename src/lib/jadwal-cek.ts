@@ -18,6 +18,9 @@ export interface AturanCek {
   bisnis: "ragu" | "biarkan";
   /** Sumber reader (menu Pengaturan): gateway pengecek terpisah (nq) atau perangkat WSPRO (aabaileys). */
   sumber_gateway: "nq" | "aabaileys";
+  /** Grade aktivitas (migrasi 007): A = aktivitas terakhir <= grade_a_hari, B = <= grade_b_hari, C = lebih lama. */
+  grade_a_hari: number;
+  grade_b_hari: number;
 }
 
 export const ATURAN_BAWAAN: AturanCek = {
@@ -33,6 +36,8 @@ export const ATURAN_BAWAAN: AturanCek = {
   ambang_buang: 25,
   bisnis: "ragu",
   sumber_gateway: "nq",
+  grade_a_hari: 3,
+  grade_b_hari: 30,
 };
 
 /** Ukuran kelompok fase aktivitas: gateway menerima maks 20 nomor bila foto ikut dicek (foto diambil per nomor). */

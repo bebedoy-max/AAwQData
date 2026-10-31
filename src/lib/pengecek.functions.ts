@@ -245,7 +245,16 @@ export const progresCekWa = createServerFn({ method: "GET" })
     // Perkiraan: nomor fase 1 + (bila aktif) perkiraan fase 2 untuk nomor yang belum dicek, disetarakan ke ukuran kelompok fase 1.
     const fase2 = aturan.cek_aktivitas ? ((p.aktif_sisa + p.sisa) * aturan.ukuran_kelompok) / ukuranKelompokAktif(aturan) : 0;
     if ((daftar as { cek_wa_status?: string }).cek_wa_status === "berjalan") pastikanPekerjaCekWa();
+    // Grade A/B/C (migrasi 007); null bila migrasi belum dijalankan.
+    const { data: gradeData, error: gradeError } = await db.rpc("aawq_grade_wa", {
+      p_daftar: daftar.id,
+      p_a_hari: aturan.grade_a_hari,
+      p_b_hari: aturan.grade_b_hari,
+    });
+    const grade = gradeError ? null : (gradeData as { a: number; b: number; c: number });
     return {
+      grade,
+      gradeHari: { a: aturan.grade_a_hari, b: aturan.grade_b_hari },
       status: (daftar as { cek_wa_status?: string }).cek_wa_status ?? "belum",
       ...p,
       perangkatSiap: siap,
@@ -279,6 +288,7 @@ export const bacaPengaturanSumber = createServerFn({ method: "GET" })
     const nq = gatewayNq();
     return {
       sumber: aturan.sumber_gateway,
+      grade: { a: aturan.grade_a_hari, b: aturan.grade_b_hari },
       nq: { terkonfigurasi: !!nq, url: nq?.url ?? null },
       wspro: { terkonfigurasi: gatewayWspro().length > 0, url: gatewayWspro().map((g) => g.url) },
     };
@@ -299,5 +309,22 @@ export const simpanSumber = createServerFn({ method: "POST" })
       const { sinkronWspro } = await import("./cek-wa.server");
       await sinkronWspro(context.userId).catch(() => undefined);
     }
+    return { ok: true };
+  });
+
+/** Batas hari grade aktivitas (Pengaturan). */
+export const simpanGrade = createServerFn({ method: "POST" })
+  .middleware([wajibMasuk])
+  .inputValidator(z.object({ a: z.number().int().min(1).max(365), b: z.number().int().min(1).max(3650) }))
+  .handler(async ({ data, context }) => {
+    if (data.b <= data.a) throw new Error("Batas grade B harus lebih besar dari batas grade A.");
+    const { supabaseAdmin } = await import("./supabase.server");
+    const db = supabaseAdmin();
+    const isi = { grade_a_hari: data.a, grade_b_hari: data.b };
+    const { data: ada } = await db.from("aawq_pengaturan").select("user_id").eq("user_id", context.userId).maybeSingle();
+    const { error } = ada
+      ? await db.from("aawq_pengaturan").update(isi).eq("user_id", context.userId)
+      : await db.from("aawq_pengaturan").insert({ user_id: context.userId, ...isi });
+    if (error) throw new Error(/grade_/.test(error.message) ? "Jalankan migrasi 007_grade_aktif.sql dulu." : error.message);
     return { ok: true };
   });

@@ -31,7 +31,7 @@ function KartuCekWa({
 }: {
   daftarId: string;
   onBerubah: () => void;
-  onUnduh: (format: "lengkap" | "nomor", kategori?: "terdaftar" | "aktif") => void;
+  onUnduh: (format: "lengkap" | "nomor", kategori?: "terdaftar" | "aktif" | "grade_a" | "grade_b" | "grade_c") => void;
 }) {
   const fnProgres = useServerFn(progresCekWa);
   const fnMulai = useServerFn(mulaiCekWa);
@@ -129,6 +129,32 @@ function KartuCekWa({
             <span className="text-buang">{angka(p.tidak_aktif)} kemungkinan tidak aktif</span>
             {p.bisnis ? <span className="text-ragu"> · {angka(p.bisnis)} akun bisnis</span> : null}
           </p>
+          {p.grade ? (
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              {(
+                [
+                  ["grade_a", "A", p.grade.a, "text-siap", `aktivitas ≤ ${p.gradeHari.a} hari`],
+                  ["grade_b", "B", p.grade.b, "text-aksen", `aktivitas ≤ ${p.gradeHari.b} hari`],
+                  ["grade_c", "C", p.grade.c, "text-ragu", `lebih lama / tanpa tanggal`],
+                ] as const
+              ).map(([k, huruf, n, warna, ket]) => (
+                <div key={k} className="rounded-md border border-garis p-2">
+                  <p className="text-sm">
+                    <b className={warna}>Grade {huruf}</b> · {angka(n)} nomor
+                  </p>
+                  <p className="text-xs text-redup">{ket}</p>
+                  <div className="mt-2 flex gap-1">
+                    <Tombol className="min-h-8 flex-1 text-xs" disabled={!n} onClick={() => onUnduh("nomor", k)}>
+                      <Download className="size-3" /> Nomor
+                    </Tombol>
+                    <Tombol varian="tipis" className="min-h-8 flex-1 text-xs" disabled={!n} onClick={() => onUnduh("lengkap", k)}>
+                      Lengkap
+                    </Tombol>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
           {p.aktif_baik ? (
             <div className="mt-2 flex flex-wrap gap-2">
               <Tombol onClick={() => onUnduh("nomor", "aktif")}>
@@ -185,7 +211,7 @@ function Halaman() {
       .catch((e: Error) => toast.error(e.message));
   }, [fnContoh, id, saring, halaman]);
 
-  async function unduh(kategori: Kat | "semua" | "terdaftar" | "aktif", format: "lengkap" | "nomor") {
+  async function unduh(kategori: Kat | "semua" | "terdaftar" | "aktif" | "grade_a" | "grade_b" | "grade_c", format: "lengkap" | "nomor") {
     try {
       const { url } = await fnTiket({ data: { daftarId: id, kategori, format } });
       const a = document.createElement("a");
