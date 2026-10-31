@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LaporanRouteImport } from './routes/laporan'
 import { Route as MasukRouteImport } from './routes/masuk'
+import { Route as PengaturanRouteImport } from './routes/pengaturan'
 import { Route as PengecekRouteImport } from './routes/pengecek'
 import { Route as DaftarIndexRouteImport } from './routes/daftar.index'
 import { Route as DaftarIdRouteImport } from './routes/daftar.$id'
@@ -31,6 +32,11 @@ const LaporanRoute = LaporanRouteImport.update({
 const MasukRoute = MasukRouteImport.update({
   id: '/masuk',
   path: '/masuk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PengaturanRoute = PengaturanRouteImport.update({
+  id: '/pengaturan',
+  path: '/pengaturan',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PengecekRoute = PengecekRouteImport.update({
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/laporan': typeof LaporanRoute
   '/masuk': typeof MasukRoute
+  '/pengaturan': typeof PengaturanRoute
   '/pengecek': typeof PengecekRoute
   '/daftar/$id': typeof DaftarIdRoute
   '/daftar/baru': typeof DaftarBaruRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/laporan': typeof LaporanRoute
   '/masuk': typeof MasukRoute
+  '/pengaturan': typeof PengaturanRoute
   '/pengecek': typeof PengecekRoute
   '/daftar/$id': typeof DaftarIdRoute
   '/daftar/baru': typeof DaftarBaruRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/laporan': typeof LaporanRoute
   '/masuk': typeof MasukRoute
+  '/pengaturan': typeof PengaturanRoute
   '/pengecek': typeof PengecekRoute
   '/daftar/$id': typeof DaftarIdRoute
   '/daftar/baru': typeof DaftarBaruRoute
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/laporan'
     | '/masuk'
+    | '/pengaturan'
     | '/pengecek'
     | '/daftar/$id'
     | '/daftar/baru'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/laporan'
     | '/masuk'
+    | '/pengaturan'
     | '/pengecek'
     | '/daftar/$id'
     | '/daftar/baru'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/'
     | '/laporan'
     | '/masuk'
+    | '/pengaturan'
     | '/pengecek'
     | '/daftar/$id'
     | '/daftar/baru'
@@ -127,6 +139,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LaporanRoute: typeof LaporanRoute
   MasukRoute: typeof MasukRoute
+  PengaturanRoute: typeof PengaturanRoute
   PengecekRoute: typeof PengecekRoute
   DaftarIdRoute: typeof DaftarIdRoute
   DaftarBaruRoute: typeof DaftarBaruRoute
@@ -155,6 +168,13 @@ declare module '@tanstack/react-router' {
       path: '/masuk'
       fullPath: '/masuk'
       preLoaderRoute: typeof MasukRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pengaturan': {
+      id: '/pengaturan'
+      path: '/pengaturan'
+      fullPath: '/pengaturan'
+      preLoaderRoute: typeof PengaturanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pengecek': {
@@ -199,6 +219,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LaporanRoute: LaporanRoute,
   MasukRoute: MasukRoute,
+  PengaturanRoute: PengaturanRoute,
   PengecekRoute: PengecekRoute,
   DaftarIdRoute: DaftarIdRoute,
   DaftarBaruRoute: DaftarBaruRoute,

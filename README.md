@@ -35,8 +35,24 @@ yang dipasangkan di menu **Pengecek WA**. Pengecekan berjalan di latar belakang 
 - Laju bisa diatur (bawaan hati-hati: 20 nomor per 8-15 detik, 15.000/hari per perangkat). Lebih banyak perangkat =
   lebih cepat; perkiraan waktu tampil di kartu cek.
 - Hasil disimpan (cache) dan dipakai ulang untuk daftar lain selama 30 hari (bisa diatur): nomor yang sama tidak dicek dua kali.
-- Butuh gateway **AABaileys** dengan endpoint `POST /api/contacts/check-exists-batch` dan `profile-batch` (cabang `claude/inspiring-pascal-u9tnq7`
+- Butuh gateway **AABaileys** dengan endpoint `POST /api/contacts/check-exists-batch` dan `profile-batch` (sudah ada di cabang `main`
   di repo AABaileys). Pakai **instance gateway terpisah** dari WSPRO.
+
+## Pengaturan: sumber reader
+
+Menu **Pengaturan** memilih perangkat yang dipakai sebagai reader (cek terdaftar dan skor aktif):
+
+| Sumber | Perangkat | Variabel server |
+| --- | --- | --- |
+| **nq-gate** (bawaan) | Perangkat pengecek khusus yang dipasangkan di menu Pengecek WA, pada instance AABaileys terpisah | `WA_GATEWAY_URL`, `WA_GATEWAY_API_KEY` |
+| **AABaileys WSPRO** | Perangkat yang sedang tersambung di gateway WSPRO (gateway 1 dan 2) | `WSPRO_GATEWAYS` = `url|kunci,url|kunci` |
+
+- Mode WSPRO: daftar perangkat dibaca dari `GET /api/sessions` tiap gateway (satu permintaan per gateway). Perangkat baru
+  masuk **nonaktif**; pemilik memilih yang boleh dipakai di menu Pengecek WA (atau *Aktifkan semua*).
+- AAwQData **tidak pernah** membuat, memasangkan, memulai, atau menghapus sesi WSPRO.
+- Pembatasan cek (`checkLimit`) di gateway terpisah dari pembatasan kirim, jadi perangkat yang ditahan untuk cek tetap bisa blast.
+- Gateway WSPRO harus versi AABaileys `main` yang sudah memuat endpoint `check-exists-batch` dan `profile-batch`.
+- Jalankan migrasi `006_sumber_reader.sql`.
 
 ## Skor aktif (Tahap 2b)
 
@@ -89,7 +105,7 @@ TanStack Start + React + Tailwind (sama dengan WSPRO, tanpa Lovable), Supabase s
 ## Pemasangan
 
 1. **Supabase baru** (self-hosted, terpisah dari WSPRO). Jalankan `db/migrations/001_awal.sql` lalu
-   `002_cek_whatsapp.sql`, `003_skor_aktif.sql`, `004_batas_waktu.sql`, `005_laporan_bio.sql` di SQL editor.
+   `002_cek_whatsapp.sql`, `003_skor_aktif.sql`, `004_batas_waktu.sql`, `005_laporan_bio.sql`, `006_sumber_reader.sql` di SQL editor.
    Migrasi bersifat aditif dan aman dijalankan ulang; migrasi berikutnya selalu berkas baru.
 2. **Pengguna**: buat akun di Supabase > Authentication > Users (email + sandi). Matikan pendaftaran publik
    (Authentication > Providers > Email > *Allow new users to sign up*), karena aplikasi ini hanya untuk pemilik.

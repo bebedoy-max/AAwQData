@@ -7,25 +7,51 @@ async function pastikanPerangkat(id: string, userId: string) {
   const { data, error } = await supabaseAdmin().from("aawq_pengecek").select("*").eq("id", id).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data || data.user_id !== userId) throw new Error("Perangkat tidak ditemukan");
-  return data as { id: string; sesi: string; nama: string };
+  return data as { id: string; sesi: string; nama: string; sumber: string; gateway: string | null };
 }
+
+/** Pemasangan dan penghapusan sesi hanya untuk perangkat nq-gate; perangkat WSPRO milik worker tidak boleh diubah. */
+function hanyaNq(p: { sumber: string }) {
+  if (p.sumber === "aabaileys") throw new Error("Perangkat ini milik WSPRO: tidak bisa dipasangkan ulang atau dihapus dari AAwQData.");
+}
+
+let terakhirSinkron = 0;
 
 export const daftarPengecek = createServerFn({ method: "GET" })
   .middleware([wajibMasuk])
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("./supabase.server");
-    const { gatewayTerkonfigurasi } = await import("./gateway.server");
-    const { aturanPengguna, segarkanStatus, pastikanPekerjaCekWa } = await import("./cek-wa.server");
+    const { sumberTerkonfigurasi } = await import("./gateway.server");
+    const { aturanPengguna, segarkanStatus, pastikanPekerjaCekWa, sinkronWspro } = await import("./cek-wa.server");
     const { kesiapan } = await import("./jadwal-cek");
     pastikanPekerjaCekWa();
-    const { data, error } = await supabaseAdmin().from("aawq_pengecek").select("*").eq("user_id", context.userId).order("dibuat");
+    const aturan = await aturanPengguna(context.userId);
+    const sumber = aturan.sumber_gateway;
+    const terkonfigurasi = sumberTerkonfigurasi(sumber);
+    let galatSinkron: string[] = [];
+    // WSPRO: satu permintaan daftar sesi per gateway (paling sering tiap 20 dtk), bukan satu per perangkat.
+    if (sumber === "aabaileys" && terkonfigurasi && Date.now() - terakhirSinkron > 20_000) {
+      terakhirSinkron = Date.now();
+      galatSinkron = (await sinkronWspro(context.userId)).galat;
+    }
+    let { data, error } = await supabaseAdmin()
+      .from("aawq_pengecek")
+      .select("*")
+      .eq("user_id", context.userId)
+      .eq("sumber", sumber)
+      .order("dibuat");
+    // Sebelum migrasi 006 kolom sumber belum ada: semua perangkat adalah perangkat nq-gate.
+    if (error && /sumber/.test(error.message) && sumber === "nq") {
+      ({ data, error } = await supabaseAdmin().from("aawq_pengecek").select("*").eq("user_id", context.userId).order("dibuat"));
+    }
     if (error) throw new Error(error.message);
     const perangkat = data ?? [];
-    if (gatewayTerkonfigurasi()) await segarkanStatus(perangkat as never);
-    const aturan = await aturanPengguna(context.userId);
+    if (sumber === "nq" && terkonfigurasi) await segarkanStatus(perangkat as never);
     const sekarang = new Date();
     return {
-      gateway: gatewayTerkonfigurasi(),
+      gateway: terkonfigurasi,
+      sumber,
+      galatSinkron,
       aturan,
       perangkat: perangkat.map((p) => ({ ...p, kesiapan: kesiapan(p as never, aturan, sekarang) })),
     };
@@ -54,6 +80,7 @@ export const statusPemasangan = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("./supabase.server");
     const { gateway, GalatGateway } = await import("./gateway.server");
     const p = await pastikanPerangkat(data.id, context.userId);
+    hanyaNq(p);
     const s = await gateway.sesi(p.sesi);
     let qr: string | null = null;
     if (s.status === "SCAN_QR_CODE") {
@@ -75,6 +102,7 @@ export const kodePairing = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { gateway } = await import("./gateway.server");
     const p = await pastikanPerangkat(data.id, context.userId);
+    hanyaNq(p);
     return gateway.kodePairing(p.sesi, data.nomor.replace(/\D/g, ""));
   });
 
@@ -83,12 +111,12 @@ export const ubahPengecek = createServerFn({ method: "POST" })
   .inputValidator(z.object({ id: z.string().uuid(), aktif: z.boolean().optional(), lepasTahan: z.boolean().optional() }))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("./supabase.server");
-    const { gateway } = await import("./gateway.server");
+    const { klienPerangkat } = await import("./gateway.server");
     const p = await pastikanPerangkat(data.id, context.userId);
     const ubah: Record<string, unknown> = {};
     if (data.aktif !== undefined) ubah["aktif"] = data.aktif;
     if (data.lepasTahan) {
-      await gateway.lepasBatasCek(p.sesi);
+      await klienPerangkat(p).lepasBatasCek(p.sesi);
       Object.assign(ubah, { ditahan_sampai: null, alasan_tahan: null });
     }
     const { error } = await supabaseAdmin().from("aawq_pengecek").update(ubah).eq("id", p.id);
@@ -103,6 +131,7 @@ export const hapusPengecek = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("./supabase.server");
     const { gateway, GalatGateway } = await import("./gateway.server");
     const p = await pastikanPerangkat(data.id, context.userId);
+    hanyaNq(p);
     try {
       await gateway.hapus(p.sesi);
     } catch (e) {
@@ -150,12 +179,18 @@ export const mulaiCekWa = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin, pastikanPemilik } = await import("./supabase.server");
     const { aturanPengguna, nilaiDariCache, pastikanPekerjaCekWa, selesaikanBilaHabis } = await import("./cek-wa.server");
-    const { gatewayTerkonfigurasi } = await import("./gateway.server");
-    if (!gatewayTerkonfigurasi()) throw new Error("Gateway belum diatur di server (WA_GATEWAY_URL, WA_GATEWAY_API_KEY).");
+    const { sumberTerkonfigurasi } = await import("./gateway.server");
     const daftar = await pastikanPemilik(data.daftarId, context.userId);
     if (daftar.status !== "selesai") throw new Error("Selesaikan analisis daftar dulu.");
     const db = supabaseAdmin();
     const aturan = await aturanPengguna(context.userId);
+    if (!sumberTerkonfigurasi(aturan.sumber_gateway)) {
+      throw new Error(
+        aturan.sumber_gateway === "nq"
+          ? "Gateway nq-gate belum diatur di server (WA_GATEWAY_URL, WA_GATEWAY_API_KEY)."
+          : "Gateway WSPRO belum diatur di server (WSPRO_GATEWAYS).",
+      );
+    }
     const { data: dariCache, error } = await db.rpc("aawq_terapkan_cache_wa", { p_daftar: daftar.id, p_umur_hari: aturan.umur_cache_hari });
     if (error) throw new Error(error.message);
     await db.from("aawq_daftar").update({ cek_wa_status: "berjalan", cek_wa_mulai: new Date().toISOString(), cek_wa_selesai_pada: null }).eq("id", daftar.id);
@@ -186,8 +221,12 @@ export const progresCekWa = createServerFn({ method: "GET" })
     const db = supabaseAdmin();
     const { data: progres, error } = await db.rpc("aawq_progres_wa", { p_daftar: daftar.id });
     if (error) throw new Error(error.message);
-    const { data: perangkat } = await db.from("aawq_pengecek").select("aktif, status, ditahan_sampai, hari, cek_hari_ini").eq("user_id", context.userId);
     const aturan = await aturanPengguna(context.userId);
+    const { data: perangkat } = await db
+      .from("aawq_pengecek")
+      .select("aktif, status, ditahan_sampai, hari, cek_hari_ini")
+      .eq("user_id", context.userId)
+      .eq("sumber", aturan.sumber_gateway);
     const sekarang = new Date();
     const siap = (perangkat ?? []).filter((p) => kesiapan(p as never, aturan, sekarang).siap).length;
     const p = progres as {
@@ -215,4 +254,50 @@ export const progresCekWa = createServerFn({ method: "GET" })
       cekAktivitas: aturan.cek_aktivitas,
       daftar: { jumlah_siap: daftar.jumlah_siap, jumlah_ragu: daftar.jumlah_ragu, jumlah_buang: daftar.jumlah_buang, jumlah_total: daftar.jumlah_total },
     };
+  });
+
+/** Nyalakan/matikan semua perangkat WSPRO yang tersambung sebagai reader sekaligus. */
+export const aturSemuaWspro = createServerFn({ method: "POST" })
+  .middleware([wajibMasuk])
+  .inputValidator(z.object({ aktif: z.boolean() }))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("./supabase.server");
+    let q = supabaseAdmin().from("aawq_pengecek").update({ aktif: data.aktif }).eq("user_id", context.userId).eq("sumber", "aabaileys");
+    if (data.aktif) q = q.eq("status", "WORKING");
+    const { error } = await q;
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Menu Pengaturan: sumber reader yang dipakai + status konfigurasi tiap sumber di server. */
+export const bacaPengaturanSumber = createServerFn({ method: "GET" })
+  .middleware([wajibMasuk])
+  .handler(async ({ context }) => {
+    const { gatewayNq, gatewayWspro } = await import("./gateway.server");
+    const { aturanPengguna } = await import("./cek-wa.server");
+    const aturan = await aturanPengguna(context.userId);
+    const nq = gatewayNq();
+    return {
+      sumber: aturan.sumber_gateway,
+      nq: { terkonfigurasi: !!nq, url: nq?.url ?? null },
+      wspro: { terkonfigurasi: gatewayWspro().length > 0, url: gatewayWspro().map((g) => g.url) },
+    };
+  });
+
+export const simpanSumber = createServerFn({ method: "POST" })
+  .middleware([wajibMasuk])
+  .inputValidator(z.object({ sumber: z.enum(["nq", "aabaileys"]) }))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("./supabase.server");
+    const db = supabaseAdmin();
+    const { data: ada } = await db.from("aawq_pengaturan").select("user_id").eq("user_id", context.userId).maybeSingle();
+    const { error } = ada
+      ? await db.from("aawq_pengaturan").update({ sumber_gateway: data.sumber }).eq("user_id", context.userId)
+      : await db.from("aawq_pengaturan").insert({ user_id: context.userId, sumber_gateway: data.sumber });
+    if (error) throw new Error(/sumber_gateway/.test(error.message) ? "Jalankan migrasi 006_sumber_reader.sql dulu." : error.message);
+    if (data.sumber === "aabaileys") {
+      const { sinkronWspro } = await import("./cek-wa.server");
+      await sinkronWspro(context.userId).catch(() => undefined);
+    }
+    return { ok: true };
   });

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Plus, RotateCcw, Trash2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Kerangka } from "@/components/kerangka";
 import { Kartu, Tombol, angka } from "@/components/ui";
 import { cekHariIni } from "@/lib/jadwal-cek";
-import { daftarPengecek, hapusPengecek, kodePairing, simpanAturan, statusPemasangan, tambahPengecek, ubahPengecek } from "@/lib/pengecek.functions";
+import { aturSemuaWspro, daftarPengecek, hapusPengecek, kodePairing, simpanAturan, statusPemasangan, tambahPengecek, ubahPengecek } from "@/lib/pengecek.functions";
 
 export const Route = createFileRoute("/pengecek")({ component: Halaman });
 
@@ -20,6 +20,7 @@ function Halaman() {
   const fnTambah = useServerFn(tambahPengecek);
   const fnUbah = useServerFn(ubahPengecek);
   const fnHapus = useServerFn(hapusPengecek);
+  const fnSemua = useServerFn(aturSemuaWspro);
   const [data, setData] = useState<Data | null>(null);
   const [pasang, setPasang] = useState<string | null>(null);
   const [nama, setNama] = useState("");
@@ -34,6 +35,9 @@ function Halaman() {
     const t = setInterval(muat, 15_000);
     return () => clearInterval(t);
   }, [muat]);
+
+  const wspro = data?.sumber === "aabaileys";
+  const aktifCount = (data?.perangkat ?? []).filter((p) => p.aktif).length;
 
   async function tambah() {
     if (!nama.trim()) return void toast.error("Isi nama perangkat.");
@@ -50,12 +54,25 @@ function Halaman() {
   return (
     <Kerangka judul="Perangkat pengecek WhatsApp">
       {data && !data.gateway ? (
-        <Kartu className="mb-4 border-ragu/40 text-sm text-ragu">Gateway belum diatur di server: isi WA_GATEWAY_URL dan WA_GATEWAY_API_KEY (instance AABaileys terpisah dari WSPRO).</Kartu>
+        <Kartu className="mb-4 border-ragu/40 text-sm text-ragu">
+          {wspro
+            ? "Gateway WSPRO belum diatur di server: isi WSPRO_GATEWAYS (url|kunci gateway AABaileys WSPRO, dipisah koma)."
+            : "Gateway belum diatur di server: isi WA_GATEWAY_URL dan WA_GATEWAY_API_KEY (instance AABaileys terpisah dari WSPRO)."}
+        </Kartu>
       ) : null}
-      <Kartu className="mb-4 text-sm text-redup">
-        Pakai <b className="text-teks">nomor WhatsApp khusus</b> untuk mengecek (bukan nomor blast). Cek massal bisa membuat nomor dibatasi WhatsApp; bila itu terjadi perangkat ditahan
-        otomatis dan perangkat lain tetap bekerja. Lebih banyak perangkat = pengecekan lebih cepat.
-      </Kartu>
+      {data?.galatSinkron?.length ? <Kartu className="mb-4 border-ragu/40 text-sm text-ragu">Gagal membaca perangkat WSPRO: {data.galatSinkron.join("; ")}</Kartu> : null}
+      {wspro ? (
+        <Kartu className="mb-4 text-sm text-redup">
+          Sumber reader: <b className="text-teks">perangkat WSPRO</b> (ubah di <Link to="/pengaturan" className="text-aksen underline">Pengaturan</Link>). Daftar di bawah adalah perangkat yang
+          sedang tersambung di gateway WSPRO. Perangkat baru masuk <b className="text-teks">nonaktif</b>: aktifkan yang boleh dipakai mengecek. AAwQData tidak pernah memasangkan atau
+          menghapus perangkat WSPRO. Cek massal bisa membuat nomor dibatasi WhatsApp untuk cek; pembatasan cek terpisah dari pengiriman, jadi blast perangkat itu tidak ikut ditahan.
+        </Kartu>
+      ) : (
+        <Kartu className="mb-4 text-sm text-redup">
+          Pakai <b className="text-teks">nomor WhatsApp khusus</b> untuk mengecek (bukan nomor blast). Cek massal bisa membuat nomor dibatasi WhatsApp; bila itu terjadi perangkat ditahan
+          otomatis dan perangkat lain tetap bekerja. Lebih banyak perangkat = pengecekan lebih cepat.
+        </Kartu>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="space-y-3">
@@ -78,7 +95,7 @@ function Halaman() {
                 </p>
               ) : null}
               <div className="mt-3 flex flex-wrap gap-2">
-                {p.status !== "WORKING" ? (
+                {!wspro && p.status !== "WORKING" ? (
                   <Tombol varian="utama" className="min-h-8 text-xs" onClick={() => setPasang(p.id)}>
                     Pasangkan
                   </Tombol>
@@ -97,30 +114,58 @@ function Halaman() {
                     <RotateCcw className="size-3" /> Lepas tahan
                   </Tombol>
                 ) : null}
-                <Tombol
-                  varian="bahaya"
-                  className="min-h-8 text-xs"
-                  onClick={() => {
-                    if (!confirm(`Hapus perangkat "${p.nama}"? Sesi WhatsApp-nya di gateway ikut dihapus.`)) return;
-                    void fnHapus({ data: { id: p.id } }).then(muat, (e: Error) => toast.error(e.message));
-                  }}
-                >
-                  <Trash2 className="size-3" /> Hapus
-                </Tombol>
+                {!wspro ? (
+                  <Tombol
+                    varian="bahaya"
+                    className="min-h-8 text-xs"
+                    onClick={() => {
+                      if (!confirm(`Hapus perangkat "${p.nama}"? Sesi WhatsApp-nya di gateway ikut dihapus.`)) return;
+                      void fnHapus({ data: { id: p.id } }).then(muat, (e: Error) => toast.error(e.message));
+                    }}
+                  >
+                    <Trash2 className="size-3" /> Hapus
+                  </Tombol>
+                ) : null}
               </div>
             </Kartu>
           ))}
-          {data && !data.perangkat.length ? <Kartu className="text-sm text-redup">Belum ada perangkat pengecek.</Kartu> : null}
+          {data && !data.perangkat.length ? (
+            <Kartu className="text-sm text-redup">{wspro ? "Belum ada perangkat WSPRO yang tersambung." : "Belum ada perangkat pengecek."}</Kartu>
+          ) : null}
         </div>
 
         <div className="space-y-4">
-          <Kartu>
-            <h2 className="mb-2 font-semibold">Tambah perangkat</h2>
-            <input value={nama} onChange={(e) => setNama(e.target.value)} maxLength={60} placeholder="Nama, mis. Pengecek 1" className="w-full rounded-md border border-garis bg-panel-2 px-3 py-2 text-sm" />
-            <Tombol varian="utama" className="mt-3 w-full" disabled={!data?.gateway} onClick={() => void tambah()}>
-              <Plus className="size-4" /> Tambah dan pasangkan
-            </Tombol>
-          </Kartu>
+          {wspro ? (
+            <Kartu>
+              <h2 className="mb-1 font-semibold">Perangkat WSPRO</h2>
+              <p className="text-sm text-redup">
+                {angka(data?.perangkat.length ?? 0)} tersambung · {angka(aktifCount)} dipakai sebagai reader
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Tombol
+                  varian="utama"
+                  className="text-xs"
+                  onClick={() => {
+                    if (!confirm("Pakai SEMUA perangkat WSPRO yang tersambung sebagai reader?")) return;
+                    void fnSemua({ data: { aktif: true } }).then(muat, (e: Error) => toast.error(e.message));
+                  }}
+                >
+                  Aktifkan semua
+                </Tombol>
+                <Tombol className="text-xs" onClick={() => void fnSemua({ data: { aktif: false } }).then(muat, (e: Error) => toast.error(e.message))}>
+                  Nonaktifkan semua
+                </Tombol>
+              </div>
+            </Kartu>
+          ) : (
+            <Kartu>
+              <h2 className="mb-2 font-semibold">Tambah perangkat</h2>
+              <input value={nama} onChange={(e) => setNama(e.target.value)} maxLength={60} placeholder="Nama, mis. Pengecek 1" className="w-full rounded-md border border-garis bg-panel-2 px-3 py-2 text-sm" />
+              <Tombol varian="utama" className="mt-3 w-full" disabled={!data?.gateway} onClick={() => void tambah()}>
+                <Plus className="size-4" /> Tambah dan pasangkan
+              </Tombol>
+            </Kartu>
+          )}
           {data ? <FormAturan aturan={data.aturan} onSimpan={muat} /> : null}
         </div>
       </div>

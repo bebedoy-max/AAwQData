@@ -42,6 +42,9 @@ export function Kerangka({ judul, aksi, children }: { judul?: ReactNode; aksi?: 
             <Link to="/pengecek" className="rounded-md px-2 py-1 text-redup hover:text-teks" activeProps={{ className: "text-teks" }}>
               Pengecek WA
             </Link>
+            <Link to="/pengaturan" className="rounded-md px-2 py-1 text-redup hover:text-teks" activeProps={{ className: "text-teks" }}>
+              Pengaturan
+            </Link>
           </nav>
           <span className="flex-1" />
           {email ? <span className="hidden text-xs text-redup md:inline">{email}</span> : null}
