@@ -23,6 +23,7 @@ function Halaman() {
   const fnSemua = useServerFn(aturSemuaWspro);
   const fnSegarkan = useServerFn(segarkanReaderWspro);
   const [segarSibuk, setSegarSibuk] = useState(false);
+  const [autoSegar, setAutoSegar] = useState(false);
   const [data, setData] = useState<Data | null>(null);
   const [pasang, setPasang] = useState<string | null>(null);
   const [nama, setNama] = useState("");
@@ -37,6 +38,38 @@ function Halaman() {
     const t = setInterval(muat, 15_000);
     return () => clearInterval(t);
   }, [muat]);
+
+  // Refresh reader WSPRO: dipakai tombol dan auto-refresh. diam = true saat auto (tanpa notifikasi tiap putaran).
+  const segarkan = useCallback(
+    (diam = false) => {
+      setSegarSibuk(true);
+      return fnSegarkan()
+        .then((r) => {
+          if (!diam) toast.success(`${r.reader} reader tersambung${r.dibuang ? ` · ${r.dibuang} terputus dibuang` : ""}`);
+          return muat();
+        })
+        .catch((e: Error) => toast.error(e.message))
+        .finally(() => setSegarSibuk(false));
+    },
+    [fnSegarkan, muat],
+  );
+
+  // Ingat pilihan auto-refresh (per peramban).
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("aawq_auto_segar") === "1") setAutoSegar(true);
+    } catch {
+      /* abaikan */
+    }
+  }, []);
+
+  // Auto-refresh tiap 30 detik selama dinyalakan, supaya tak perlu klik manual saat ditinggal.
+  useEffect(() => {
+    if (!autoSegar) return;
+    void segarkan(true);
+    const t = setInterval(() => void segarkan(true), 30_000);
+    return () => clearInterval(t);
+  }, [autoSegar, segarkan]);
 
   const wspro = data?.sumber === "aabaileys";
   const aktifCount = (data?.perangkat ?? []).filter((p) => p.aktif).length;
@@ -144,22 +177,8 @@ function Halaman() {
                 {angka(data?.perangkat.length ?? 0)} tersambung · {angka(aktifCount)} dipakai sebagai reader
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <Tombol
-                  varian="utama"
-                  className="text-xs"
-                  disabled={segarSibuk}
-                  onClick={() => {
-                    setSegarSibuk(true);
-                    void fnSegarkan()
-                      .then((r) => {
-                        toast.success(`${r.reader} reader tersambung${r.dibuang ? ` · ${r.dibuang} terputus dibuang` : ""}`);
-                        return muat();
-                      })
-                      .catch((e: Error) => toast.error(e.message))
-                      .finally(() => setSegarSibuk(false));
-                  }}
-                >
-                  <RotateCcw className="size-3" /> {segarSibuk ? "Menyegarkan…" : "Refresh"}
+                <Tombol varian="utama" className="text-xs" disabled={segarSibuk} onClick={() => void segarkan()}>
+                  <RotateCcw className={`size-3 ${segarSibuk ? "animate-spin" : ""}`} /> {segarSibuk ? "Menyegarkan…" : "Refresh"}
                 </Tombol>
                 <Tombol
                   className="text-xs"
@@ -171,8 +190,23 @@ function Halaman() {
                   Lepaskan semua
                 </Tombol>
               </div>
+              <label className="mt-3 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={autoSegar}
+                  onChange={(e) => {
+                    setAutoSegar(e.target.checked);
+                    try {
+                      localStorage.setItem("aawq_auto_segar", e.target.checked ? "1" : "0");
+                    } catch {
+                      /* abaikan */
+                    }
+                  }}
+                />
+                Auto-refresh tiap 30 detik {autoSegar ? <span className="text-siap">· aktif</span> : null}
+              </label>
               <p className="mt-2 text-xs text-redup">
-                Refresh: buang perangkat yang terputus atau dibatasi WhatsApp, lalu aktifkan semua yang baru tersambung sebagai reader (jumlah berubah dinamis). Lepaskan semua: nonaktifkan semua reader sementara.
+                Refresh: buang perangkat yang terputus atau dibatasi WhatsApp, lalu aktifkan semua yang baru tersambung sebagai reader (jumlah berubah dinamis). Auto-refresh menjalankannya otomatis saat halaman ini terbuka, jadi tak perlu klik manual. Lepaskan semua: nonaktifkan semua reader sementara.
               </p>
             </Kartu>
           ) : (
