@@ -5,8 +5,12 @@ import { supabaseAdmin } from "./supabase.server";
 interface Tiket {
   daftarId: string;
   nama: string;
-  /** "terdaftar" = semua nomor yang terdaftar WhatsApp (wa = true), apa pun kategorinya. */
-  kategori: "siap" | "ragu" | "buang" | "semua" | "terdaftar";
+  /**
+   * "terdaftar" = semua nomor yang terdaftar WhatsApp (wa = true), apa pun kategorinya.
+   * "aktif" = nomor bernilai skor aktif yang tidak bertanda aktivitas rendah / kemungkinan tidak aktif
+   * (sama dengan angka "aktif" di kartu Skor aktif, aawq_progres_wa.aktif_baik).
+   */
+  kategori: "siap" | "ragu" | "buang" | "semua" | "terdaftar" | "aktif";
   format: "lengkap" | "nomor" | "laporan";
   userId: string;
   habis: number;
@@ -56,6 +60,9 @@ export function aliranCsv(t: Tiket): ReadableStream<Uint8Array> {
         .order("id")
         .limit(5000);
       if (t.kategori === "terdaftar") q = q.eq("wa", true);
+      else if (t.kategori === "aktif") {
+        q = q.eq("aktif_dinilai", true).not("aktif_skor", "is", null).not("alasan", "ov", "{aktivitas_rendah,kemungkinan_tidak_aktif}");
+      }
       else if (t.kategori !== "semua") q = q.eq("kategori", t.kategori);
       if (t.format === "nomor") q = q.not("e164", "is", null);
       const { data, error } = await q;
